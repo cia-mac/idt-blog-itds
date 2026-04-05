@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-013: Trigger Modes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .subtitle span {
+    color: #E8B600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  /* ── RING BUFFER CANVAS ── */
+  #ringCanvas {
+    width: 100%;
+    height: 380px;
+    display: block;
+    border-radius: 8px;
+  }
+
+  /* ── TIMELINE CANVAS ── */
+  #timelineCanvas {
+    width: 100%;
+    height: 160px;
+    display: block;
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+
+  /* ── MODE TOGGLES ── */
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toggle-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+    margin-right: 6px;
+  }
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 7px 16px;
+    cursor: pointer;
+    background: #141414;
+    color: #555;
+    border: none;
+    transition: background 0.2s, color 0.2s;
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .chip:hover { background: #1a1a1a; color: #888; }
+  .chip.active { background: #E8B600; color: #0c0c0c; font-weight: 600; }
+
+  /* ── READOUT CARDS ── */
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: #ccc;
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: #E8B600; }
+  .readout-card-value.red { color: #D94040; }
+  .readout-card-value.green { color: #40B060; }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s, background 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #E8B600; color: #0c0c0c; }
+  .btn-secondary { background: #1e1e1e; color: #888; }
+  .btn-trigger { background: #D94040; color: #fff; }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #555;
+  }
+  .speed-ctrl input[type="range"] {
+    width: 80px;
+    -webkit-appearance: none;
+    height: 3px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #E8B600;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* ── NOTE ── */
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .note p {
+    font-size: 0.82em;
+    color: #888;
+    line-height: 1.65;
+  }
+  .note strong { color: #bbb; }
+
+  /* ── SPECS STRIP ── */
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 14px 0;
+    border-top: 1px solid #1a1a1a;
+    margin-top: 20px;
+  }
+  .spec-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #E8B600;
+  }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #ringCanvas { height: 300px; }
+    #timelineCanvas { height: 120px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Trigger Modes and Ring Buffers</h1>
+  <div class="subtitle">The camera is always recording. The trigger decides what to keep. <span>ITD-013</span></div>
+
+  <!-- RING BUFFER -->
+  <div class="panel">
+    <div class="panel-label">Ring Buffer Memory</div>
+    <canvas id="ringCanvas"></canvas>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnPlay">Play</button>
+      <button class="btn btn-trigger" id="btnTrigger">Trigger</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+      <div class="speed-ctrl">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="0.3" max="2" step="0.1" value="1">
+        <span class="speed-val" id="speedVal">1.0x</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODE SELECT -->
+  <div class="panel">
+    <div class="panel-label">Trigger Configuration</div>
+    <div class="toggle-row">
+      <span class="toggle-group-label">Mode</span>
+      <div class="toggle-group" id="modeToggle">
+        <button class="chip" data-mode="start">Start</button>
+        <button class="chip active" data-mode="center">Center</button>
+        <button class="chip" data-mode="end">End</button>
+      </div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Mode</div>
+        <div class="readout-card-value gold" id="cardMode">Center Trigger</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Buffer State</div>
+        <div class="readout-card-value" id="cardState">Recording</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Pre-Trigger</div>
+        <div class="readout-card-value" id="cardPre">50%</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Post-Trigger</div>
+        <div class="readout-card-value" id="cardPost">50%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="panel">
+    <div class="panel-label">Linear Timeline</div>
+    <canvas id="timelineCanvas"></canvas>
+  </div>
+
+  <!-- NOTE -->
+  <div class="note">
+    <p>High-speed cameras record continuously into a circular memory buffer. Old frames are overwritten as new ones arrive. The <strong>trigger</strong> marks a moment in time and tells the camera where to stop overwriting. In <strong>end trigger</strong> (pre-trigger) mode, everything before the trigger is kept. In <strong>start trigger</strong> (post-trigger) mode, everything after is kept. <strong>Center trigger</strong> splits the buffer evenly around the event. The operator does not need to predict when the event will happen. The buffer already contains it.</p>
+  </div>
+
+  <!-- SPECS -->
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-013</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Trigger Logic</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Toggle + Trigger</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Source</span>
+      <span class="spec-value">idtcameras.com</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONFIG ──
+  const TOTAL_SLOTS = 64;
+  const COL_GOLD = '#E8B600';
+  const COL_RED = '#D94040';
+  const COL_GREEN = '#40B060';
+  const COL_BLUE = '#4080D0';
+  const COL_DIM = '#1a1a1a';
+  const COL_KEPT = '#E8B600';
+  const COL_OVERWRITTEN = '#1e1e1e';
+  const COL_RECORDING = '#4080D0';
+  const COL_POST = '#40B060';
+
+  // ── STATE ──
+  let triggerMode = 'center'; // start | center | end
+  let playing = false;
+  let speed = 1;
+  let animId = null;
+  let lastTime = 0;
+
+  // Ring buffer state
+  let writeHead = 0;        // current write position (0..TOTAL_SLOTS-1)
+  let totalWritten = 0;     // total frames written since start
+  let triggered = false;
+  let triggerFrame = -1;    // which slot was the write head at when triggered
+  let triggerWritten = -1;  // totalWritten at trigger time
+  let postTriggerCount = 0; // frames written after trigger
+  let finished = false;     // recording complete, showing saved region
+  let slotAge = new Array(TOTAL_SLOTS).fill(-1); // when each slot was written
+
+  // How many post-trigger frames to record per mode
+  function getPostTriggerSlots() {
+    if (triggerMode === 'start') return TOTAL_SLOTS;    // all post
+    if (triggerMode === 'end') return 0;                // all pre
+    return Math.floor(TOTAL_SLOTS / 2);                 // half and half
+  }
+
+  function getPreTriggerSlots() {
+    return TOTAL_SLOTS - getPostTriggerSlots();
+  }
+
+  // ── CANVASES ──
+  const ringCanvas = document.getElementById('ringCanvas');
+  const rCtx = ringCanvas.getContext('2d');
+  const tlCanvas = document.getElementById('timelineCanvas');
+  const tCtx = tlCanvas.getContext('2d');
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    for (const [cvs, ctx_] of [[ringCanvas, rCtx], [tlCanvas, tCtx]]) {
+      const rect = cvs.getBoundingClientRect();
+      cvs.width = rect.width * dpr;
+      cvs.height = rect.height * dpr;
+      ctx_.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
+
+  function resetState() {
+    writeHead = 0;
+    totalWritten = 0;
+    triggered = false;
+    triggerFrame = -1;
+    triggerWritten = -1;
+    postTriggerCount = 0;
+    finished = false;
+    slotAge = new Array(TOTAL_SLOTS).fill(-1);
+    updateCards();
+  }
+
+  // ── STEP ──
+  let accumulator = 0;
+  const FRAME_INTERVAL = 0.06; // seconds per ring slot write at 1x
+
+  function step(dt) {
+    if (finished) return;
+
+    accumulator += dt * speed;
+    while (accumulator >= FRAME_INTERVAL) {
+      accumulator -= FRAME_INTERVAL;
+
+      slotAge[writeHead] = totalWritten;
+      writeHead = (writeHead + 1) % TOTAL_SLOTS;
+      totalWritten++;
+
+      if (triggered) {
+        postTriggerCount++;
+        const needed = getPostTriggerSlots();
+        if (postTriggerCount >= needed) {
+          finished = true;
+          playing = false;
+          document.getElementById('btnPlay').textContent = 'Play';
+          break;
+        }
+      }
+    }
+  }
+
+  // ── DRAW RING ──
+  function drawRing() {
+    const w = ringCanvas.getBoundingClientRect().width;
+    const h = ringCanvas.getBoundingClientRect().height;
+    rCtx.clearRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const outerR = Math.min(cx, cy) - 30;
+    const innerR = outerR - 36;
+    const slotAngle = (Math.PI * 2) / TOTAL_SLOTS;
+    const startAngle = -Math.PI / 2; // 12 o'clock
+
+    // Determine saved region for highlighting
+    let savedStart = -1, savedEnd = -1;
+    if (triggered || finished) {
+      const pre = getPreTriggerSlots();
+      const post = getPostTriggerSlots();
+      savedStart = (triggerFrame - pre + TOTAL_SLOTS) % TOTAL_SLOTS;
+      savedEnd = (triggerFrame + post) % TOTAL_SLOTS;
+    }
+
+    function isInSavedRegion(slot) {
+      if (!triggered && !finished) return false;
+      const pre = getPreTriggerSlots();
+      const post = getPostTriggerSlots();
+      const start = (triggerFrame - pre + TOTAL_SLOTS) % TOTAL_SLOTS;
+      // Check if slot is in the saved range
+      const dist = (slot - start + TOTAL_SLOTS) % TOTAL_SLOTS;
+      return dist < TOTAL_SLOTS; // always true, but we want pre+post
+      // Better: count from saved start
+      const totalSaved = pre + post;
+      const d = (slot - start + TOTAL_SLOTS) % TOTAL_SLOTS;
+      return d < totalSaved;
+    }
+
+    function getSlotState(i) {
+      // Not yet written
+      if (slotAge[i] < 0) return 'empty';
+
+      if (finished) {
+        // Determine if this slot is in the kept window
+        const pre = getPreTriggerSlots();
+        const post = getPostTriggerSlots();
+        const savedStartSlot = (triggerFrame - pre + TOTAL_SLOTS) % TOTAL_SLOTS;
+        const d = (i - savedStartSlot + TOTAL_SLOTS) % TOTAL_SLOTS;
+        if (d < pre + post) return 'kept';
+        return 'overwritten';
+      }
+
+      if (triggered) {
+        // After trigger: color post-trigger frames differently
+        if (slotAge[i] >= triggerWritten) return 'post';
+        return 'recording';
+      }
+
+      return 'recording';
+    }
+
+    // Draw slots
+    for (let i = 0; i < TOTAL_SLOTS; i++) {
+      const a1 = startAngle + i * slotAngle + 0.01;
+      const a2 = startAngle + (i + 1) * slotAngle - 0.01;
+      const state = getSlotState(i);
+
+      let color = COL_DIM;
+      let alpha = 1;
+      if (state === 'recording') {
+        color = COL_RECORDING;
+        // Fade based on age
+        const age = totalWritten - slotAge[i];
+        alpha = Math.max(0.15, 1 - age / TOTAL_SLOTS * 0.7);
+      } else if (state === 'post') {
+        color = COL_POST;
+        alpha = 0.8;
+      } else if (state === 'kept') {
+        color = COL_KEPT;
+        alpha = 0.85;
+      } else if (state === 'overwritten') {
+        color = '#111';
+        alpha = 0.3;
+      } else {
+        alpha = 0.4;
+      }
+
+      rCtx.beginPath();
+      rCtx.arc(cx, cy, outerR, a1, a2);
+      rCtx.arc(cx, cy, innerR, a2, a1, true);
+      rCtx.closePath();
+      rCtx.fillStyle = color;
+      rCtx.globalAlpha = alpha;
+      rCtx.fill();
+      rCtx.globalAlpha = 1;
+    }
+
+    // Write head indicator
+    if (!finished) {
+      const headAngle = startAngle + writeHead * slotAngle + slotAngle / 2;
+      const hx = cx + Math.cos(headAngle) * (outerR + 14);
+      const hy = cy + Math.sin(headAngle) * (outerR + 14);
+
+      rCtx.beginPath();
+      rCtx.arc(hx, hy, 5, 0, Math.PI * 2);
+      rCtx.fillStyle = '#fff';
+      rCtx.fill();
+
+      // Label
+      rCtx.font = '500 9px "JetBrains Mono", monospace';
+      rCtx.fillStyle = '#666';
+      rCtx.textAlign = 'center';
+      const lx = cx + Math.cos(headAngle) * (outerR + 28);
+      const ly = cy + Math.sin(headAngle) * (outerR + 28);
+      rCtx.fillText('WRITE', lx, ly + 3);
+    }
+
+    // Trigger marker
+    if (triggered || finished) {
+      const tAngle = startAngle + triggerFrame * slotAngle + slotAngle / 2;
+      const tx = cx + Math.cos(tAngle) * ((outerR + innerR) / 2);
+      const ty = cy + Math.sin(tAngle) * ((outerR + innerR) / 2);
+
+      // Flash effect
+      const flash = finished ? 1 : 0.5 + 0.5 * Math.sin(Date.now() / 200);
+
+      rCtx.beginPath();
+      rCtx.arc(tx, ty, 8, 0, Math.PI * 2);
+      rCtx.fillStyle = COL_RED;
+      rCtx.globalAlpha = flash;
+      rCtx.fill();
+      rCtx.globalAlpha = 1;
+
+      // Trigger line outward
+      const tox = cx + Math.cos(tAngle) * (outerR + 10);
+      const toy = cy + Math.sin(tAngle) * (outerR + 10);
+      rCtx.beginPath();
+      rCtx.moveTo(cx + Math.cos(tAngle) * outerR, cy + Math.sin(tAngle) * outerR);
+      rCtx.lineTo(tox, toy);
+      rCtx.strokeStyle = COL_RED;
+      rCtx.lineWidth = 2;
+      rCtx.stroke();
+
+      // T label
+      rCtx.font = '700 10px "JetBrains Mono", monospace';
+      rCtx.fillStyle = COL_RED;
+      rCtx.textAlign = 'center';
+      const tlx = cx + Math.cos(tAngle) * (outerR + 22);
+      const tly = cy + Math.sin(tAngle) * (outerR + 22);
+      rCtx.fillText('T', tlx, tly + 4);
+    }
+
+    // Center labels
+    rCtx.font = '600 14px "JetBrains Mono", monospace';
+    rCtx.fillStyle = '#333';
+    rCtx.textAlign = 'center';
+    rCtx.fillText('RING BUFFER', cx, cy - 14);
+
+    rCtx.font = '400 10px "JetBrains Mono", monospace';
+    rCtx.fillStyle = '#2a2a2a';
+    rCtx.fillText(`${TOTAL_SLOTS} slots`, cx, cy + 4);
+
+    if (finished) {
+      rCtx.font = '600 12px "JetBrains Mono", monospace';
+      rCtx.fillStyle = COL_KEPT;
+      rCtx.fillText('SAVED', cx, cy + 24);
+    } else if (triggered) {
+      rCtx.font = '600 11px "JetBrains Mono", monospace';
+      rCtx.fillStyle = COL_RED;
+      const remaining = getPostTriggerSlots() - postTriggerCount;
+      rCtx.fillText(`${remaining} frames left`, cx, cy + 24);
+    } else if (playing) {
+      rCtx.font = '500 11px "JetBrains Mono", monospace';
+      rCtx.fillStyle = COL_RECORDING;
+      rCtx.fillText('RECORDING', cx, cy + 24);
+    }
+
+    // Legend
+    const legY = h - 14;
+    rCtx.font = '400 9px "JetBrains Mono", monospace';
+    rCtx.textAlign = 'left';
+    const legends = [
+      { color: COL_RECORDING, label: 'Pre-trigger' },
+      { color: COL_POST, label: 'Post-trigger' },
+      { color: COL_KEPT, label: 'Saved' },
+    ];
+    let lx = 16;
+    for (const leg of legends) {
+      rCtx.fillStyle = leg.color;
+      rCtx.fillRect(lx, legY - 6, 8, 8);
+      rCtx.fillStyle = '#555';
+      rCtx.fillText(leg.label, lx + 12, legY + 1);
+      lx += rCtx.measureText(leg.label).width + 28;
+    }
+  }
+
+  // ── DRAW TIMELINE ──
+  function drawTimeline() {
+    const w = tlCanvas.getBoundingClientRect().width;
+    const h = tlCanvas.getBoundingClientRect().height;
+    tCtx.clearRect(0, 0, w, h);
+
+    const margin = { left: 20, right: 20, top: 24, bottom: 24 };
+    const barH = 32;
+    const barY = (h - barH) / 2;
+    const barW = w - margin.left - margin.right;
+
+    // Background bar
+    tCtx.fillStyle = '#161616';
+    roundRect(tCtx, margin.left, barY, barW, barH, 4);
+
+    // Mode label
+    tCtx.font = '500 9px "JetBrains Mono", monospace';
+    tCtx.fillStyle = '#333';
+    tCtx.textAlign = 'left';
+    const modeNames = { start: 'Start Trigger (Post)', center: 'Center Trigger', end: 'End Trigger (Pre)' };
+    tCtx.fillText(modeNames[triggerMode], margin.left, barY - 8);
+
+    // Time arrow
+    tCtx.fillStyle = '#2a2a2a';
+    tCtx.textAlign = 'right';
+    tCtx.fillText('Time \u2192', w - margin.right, barY - 8);
+
+    const pre = getPreTriggerSlots();
+    const post = getPostTriggerSlots();
+    const preFrac = pre / TOTAL_SLOTS;
+    const postFrac = post / TOTAL_SLOTS;
+
+    // Pre-trigger region
+    if (pre > 0) {
+      const preW = preFrac * barW;
+      tCtx.fillStyle = triggered || finished ? COL_RECORDING : '#1e1e1e';
+      tCtx.globalAlpha = finished ? 0.7 : 0.3;
+      roundRectPartial(tCtx, margin.left, barY, preW, barH, 4, true, false);
+      tCtx.globalAlpha = 1;
+
+      // Label
+      tCtx.font = '500 9px "JetBrains Mono", monospace';
+      tCtx.fillStyle = triggered || finished ? COL_RECORDING : '#333';
+      tCtx.textAlign = 'center';
+      tCtx.fillText(`Pre: ${pre} frames`, margin.left + preW / 2, barY + barH / 2 + 3);
+    }
+
+    // Post-trigger region
+    if (post > 0) {
+      const preW = preFrac * barW;
+      const postW = postFrac * barW;
+      const postFilled = triggered || finished ? Math.min(postTriggerCount / post, 1) : 0;
+
+      // Post background
+      tCtx.fillStyle = '#1a1a1a';
+      tCtx.globalAlpha = 0.3;
+      roundRectPartial(tCtx, margin.left + preW, barY, postW, barH, 4, false, true);
+      tCtx.globalAlpha = 1;
+
+      // Post filled
+      if (postFilled > 0) {
+        const filledW = postFilled * postW;
+        tCtx.fillStyle = finished ? COL_KEPT : COL_POST;
+        tCtx.globalAlpha = finished ? 0.7 : 0.6;
+        tCtx.fillRect(margin.left + preW, barY, filledW, barH);
+        tCtx.globalAlpha = 1;
+      }
+
+      // Label
+      tCtx.font = '500 9px "JetBrains Mono", monospace';
+      tCtx.fillStyle = (triggered || finished) ? COL_POST : '#333';
+      tCtx.textAlign = 'center';
+      tCtx.fillText(`Post: ${post} frames`, margin.left + preW + postW / 2, barY + barH / 2 + 3);
+    }
+
+    // Trigger marker line
+    const triggerX = margin.left + preFrac * barW;
+    tCtx.strokeStyle = COL_RED;
+    tCtx.lineWidth = 2;
+    tCtx.beginPath();
+    tCtx.moveTo(triggerX, barY - 6);
+    tCtx.lineTo(triggerX, barY + barH + 6);
+    tCtx.stroke();
+
+    // T marker
+    tCtx.beginPath();
+    tCtx.arc(triggerX, barY - 10, 7, 0, Math.PI * 2);
+    tCtx.fillStyle = triggered || finished ? COL_RED : '#2a2a2a';
+    tCtx.fill();
+    tCtx.font = '700 8px "JetBrains Mono", monospace';
+    tCtx.fillStyle = triggered || finished ? '#fff' : '#555';
+    tCtx.textAlign = 'center';
+    tCtx.fillText('T', triggerX, barY - 7);
+
+    // Progress indicator during post-trigger recording
+    if (triggered && !finished && post > 0) {
+      const progressX = triggerX + (postTriggerCount / post) * postFrac * barW;
+      tCtx.strokeStyle = '#fff';
+      tCtx.lineWidth = 1.5;
+      tCtx.setLineDash([3, 3]);
+      tCtx.beginPath();
+      tCtx.moveTo(progressX, barY);
+      tCtx.lineTo(progressX, barY + barH);
+      tCtx.stroke();
+      tCtx.setLineDash([]);
+    }
+
+    // Saved label at bottom
+    if (finished) {
+      tCtx.font = '600 10px "JetBrains Mono", monospace';
+      tCtx.fillStyle = COL_KEPT;
+      tCtx.textAlign = 'center';
+      tCtx.fillText('\u2190 Saved to disk \u2192', w / 2, barY + barH + 18);
+    }
+  }
+
+  // ── HELPERS ──
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function roundRectPartial(ctx, x, y, w, h, r, roundLeft, roundRight) {
+    const tl = roundLeft ? r : 0;
+    const tr = roundRight ? r : 0;
+    const br = roundRight ? r : 0;
+    const bl = roundLeft ? r : 0;
+    ctx.beginPath();
+    ctx.moveTo(x + tl, y);
+    ctx.lineTo(x + w - tr, y);
+    ctx.arcTo(x + w, y, x + w, y + tr, tr);
+    ctx.lineTo(x + w, y + h - br);
+    ctx.arcTo(x + w, y + h, x + w - br, y + h, br);
+    ctx.lineTo(x + bl, y + h);
+    ctx.arcTo(x, y + h, x, y + h - bl, bl);
+    ctx.lineTo(x, y + tl);
+    ctx.arcTo(x, y, x + tl, y, tl);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function updateCards() {
+    const modeNames = { start: 'Start (Post)', center: 'Center', end: 'End (Pre)' };
+    document.getElementById('cardMode').textContent = modeNames[triggerMode];
+
+    let state = 'Idle';
+    if (finished) state = 'Saved';
+    else if (triggered) state = 'Post-trigger';
+    else if (playing) state = 'Recording';
+    document.getElementById('cardState').textContent = state;
+
+    const pre = getPreTriggerSlots();
+    const post = getPostTriggerSlots();
+    document.getElementById('cardPre').textContent = pre === 0 ? 'None' : `${Math.round(pre / TOTAL_SLOTS * 100)}% (${pre} frames)`;
+    document.getElementById('cardPost').textContent = post === 0 ? 'None' : `${Math.round(post / TOTAL_SLOTS * 100)}% (${post} frames)`;
+  }
+
+  // ── ANIMATION ──
+  function animate(time) {
+    if (!lastTime) lastTime = time;
+    const dt = Math.min((time - lastTime) / 1000, 0.05);
+    lastTime = time;
+
+    if (playing) step(dt);
+
+    drawRing();
+    drawTimeline();
+    animId = requestAnimationFrame(animate);
+  }
+
+  // ── OBSERVER ──
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastTime = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(ringCanvas);
+
+  // ── CONTROLS ──
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    if (finished) resetState();
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  document.getElementById('btnTrigger').addEventListener('click', () => {
+    if (!playing || triggered || finished) return;
+    triggered = true;
+    triggerFrame = (writeHead - 1 + TOTAL_SLOTS) % TOTAL_SLOTS;
+    triggerWritten = totalWritten;
+    postTriggerCount = 0;
+
+    // For end trigger (all pre), finish immediately
+    if (getPostTriggerSlots() === 0) {
+      finished = true;
+      playing = false;
+      document.getElementById('btnPlay').textContent = 'Play';
+    }
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    playing = false;
+    document.getElementById('btnPlay').textContent = 'Play';
+    resetState();
+  });
+
+  document.getElementById('speedSlider').addEventListener('input', (e) => {
+    speed = parseFloat(e.target.value);
+    document.getElementById('speedVal').textContent = speed.toFixed(1) + 'x';
+  });
+
+  // Mode toggle
+  document.querySelectorAll('#modeToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#modeToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      triggerMode = chip.dataset.mode;
+      resetState();
+      updateCards();
+    });
+  });
+
+  // ── INIT ──
+  resize();
+  resetState();
+  drawRing();
+  drawTimeline();
+  window.addEventListener('resize', () => { resize(); drawRing(); drawTimeline(); });
+})();
+</script>
+</body>
+</html>

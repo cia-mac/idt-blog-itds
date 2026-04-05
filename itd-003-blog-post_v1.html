@@ -1,0 +1,23 @@
+<h2>No Operator Required: How the CrashCam Mini Runs a Complete Capture Cycle Autonomously</h2>
+
+<p><em>By Ciamac Parhizi</em></p>
+
+<h3>The Problem: Every Camera Needs a Human</h3>
+
+<p>In most broadcast and industrial high-speed setups, an operator manages the capture cycle. They watch for the moment, press the trigger, wait for the recording buffer to fill, switch to playback, route the output, and reset for the next event. This is manageable with one or two cameras. It breaks down at scale. A horse racing venue with 15 fence-level camera positions cannot staff 15 dedicated operators. A crash test lab running six simultaneous angles cannot have an engineer at every station pressing buttons within the same 200-millisecond window. The bottleneck is not the camera hardware. It is the assumption that a human must be in the loop.</p>
+
+<h3>The IDT Solution: A Six-State Machine With No Operator</h3>
+
+<p>The CrashCam Mini operates as a finite state machine with six states: Idle, Armed, Triggered, Recording, Playback, and Reset. Each state has a defined entry condition, a defined action, and a defined output. The transitions between states happen automatically based on sensor data and internal timing. No external command is required at any point in the cycle.</p>
+
+<iframe src="/itd/itd-003-state-machine.html" width="100%" height="600" frameborder="0" style="border:none; border-radius:4px;"></iframe>
+
+<p>The interactive diagram above shows the full lifecycle. Click any state to inspect what the camera is doing, what signal it outputs, and what an operator monitoring the SDI feed would see. The key transition is from Recording to Playback: the camera finishes capturing at 1000 fps and immediately begins looping the clip over 3G-SDI at 50 Hz. No file transfer, no manual playback command, no delay. After playback, the system resets and re-arms itself for the next event.</p>
+
+<h3>Why It Matters: The Space Between Trigger and Replay</h3>
+
+<p>The value of this architecture is in what it removes. Between the trigger firing and the slow-motion replay appearing on the broadcast feed, there are zero manual steps. The camera detects motion, records, enters playback, and outputs clean SDI. The entire sequence completes in seconds. For RaceTech's horse racing coverage, this means every fence has instant replay available on every race, without adding production staff. For crash testing, it means all cameras fire and play back in sync, driven by the same event, without an engineer coordinating timing across stations.</p>
+
+<h3>Real-World Application</h3>
+
+<p>IDT's CrashCam Mini uses this state machine architecture across multiple deployment types. In broadcast, the autonomous cycle feeds directly into OB truck vision mixers. In automotive crash testing, the cameras survive 200G impacts and play back immediately for engineers reviewing deformation sequences. In research environments, Ethernet control allows remote monitoring of state transitions across a network of cameras. The state machine is the same in every case. The camera handles the timing. The human handles the analysis.</p>

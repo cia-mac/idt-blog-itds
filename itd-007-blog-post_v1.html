@@ -1,0 +1,29 @@
+<!-- ITD-007 Blog Post: Sensor Readout Modes — WordPress Elementor-ready HTML -->
+<!-- Word count target: 400-500 words | IDT voice: technical authority, no hype, third-person neutral -->
+
+<h2>Why Sensor Readout Architecture Matters for High-Speed Imaging</h2>
+
+<p>Every high-speed camera captures motion the same way: photons hit silicon, electrons accumulate, and the resulting charge is converted into a digital signal. What separates one sensor from another is how that charge is collected and read out. Two architectural decisions, shutter type and illumination direction, determine the practical limits of what a camera can resolve.</p>
+
+<h3>Rolling vs. Global Shutter</h3>
+
+<p>A rolling shutter reads the sensor row by row, from top to bottom. Each row begins its exposure at a slightly different moment. For slow-moving subjects, the offset is invisible. For a crash test dummy traveling at 50 km/h or a turbine blade rotating at 10,000 RPM, the result is spatial distortion. The top of the frame and the bottom of the frame represent different points in time. Vertical lines bend. Round objects stretch into ovals.</p>
+
+<p>A global shutter exposes every pixel on the sensor simultaneously. All rows start and stop their exposure at the same instant. The readout still happens sequentially, but the temporal alignment of the captured image is exact. This eliminates motion artifacts entirely, which is why global shutter sensors are standard in applications where geometric accuracy is non-negotiable: particle image velocimetry, ballistic testing, structural deformation analysis.</p>
+
+<p>The tradeoff is noise. Global shutter sensors require additional transistors per pixel to hold charge during the readout phase. Those transistors consume space that would otherwise collect light. The result is typically lower fill factor and higher read noise compared to an equivalent rolling shutter design.</p>
+
+<!-- ITD-007 Interactive Diagram Embed -->
+<iframe src="/itd/itd-007-sensor-readout_v1.html" width="100%" height="920" frameborder="0" style="border-radius: 12px; max-width: 900px;" loading="lazy"></iframe>
+
+<h3>Front-Side vs. Back-Side Illumination</h3>
+
+<p>In a conventional front-side illuminated (FSI) sensor, light passes through the metal wiring layers before reaching the photodiode. Those layers block and reflect a significant portion of incoming photons. Quantum efficiency, the percentage of photons that actually generate signal, typically sits around 50%.</p>
+
+<p>Back-side illuminated (BSI) sensors flip the silicon wafer so light enters the photodiode directly, without passing through the wiring. This increases quantum efficiency to 80-95%, depending on wavelength. The practical effect is better sensitivity in low-light conditions and cleaner signal at the same exposure settings. BSI has become the dominant architecture in modern CMOS sensors, though manufacturing complexity and cost remain higher than FSI.</p>
+
+<h3>Choosing the Right Combination</h3>
+
+<p>For high-speed industrial and scientific imaging, the optimal configuration depends on what is being measured. Crash testing and ballistics demand global shutter for geometric fidelity. PIV and flow visualization benefit from BSI for improved particle detection at short exposure times. Broadcast slow-motion, where subjects move fast but absolute spatial accuracy is less critical, can use rolling shutter sensors with higher frame rates and lower noise floors.</p>
+
+<p>Understanding these tradeoffs at the sensor level is what separates selecting the right camera from selecting the most expensive one.</p>

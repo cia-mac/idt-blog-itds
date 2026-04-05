@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-003: Autonomous Camera Lifecycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .subtitle span {
+    color: #E8B600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  /* ── STATE MACHINE CANVAS ── */
+  #stateMachineCanvas {
+    width: 100%;
+    height: 420px;
+    display: block;
+    border-radius: 8px;
+    cursor: default;
+  }
+
+  /* ── INFO PANEL ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .info-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+    transition: border-color 0.4s, background 0.4s;
+  }
+  .info-card.active {
+    border-color: #E8B600;
+    background: rgba(232, 182, 0, 0.06);
+  }
+  .info-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .info-card.active .info-card-label { color: #E8B600; }
+  .info-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #666;
+    min-height: 32px;
+    transition: color 0.3s;
+  }
+  .info-card.active .info-card-value { color: #ccc; }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s, background 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #E8B600; color: #0c0c0c; }
+  .btn-secondary { background: #1e1e1e; color: #888; }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #555;
+  }
+  .speed-ctrl input[type="range"] {
+    width: 80px;
+    -webkit-appearance: none;
+    height: 3px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #E8B600;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* ── STATUS ── */
+  .status-log {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: #555;
+    min-height: 20px;
+    margin-top: 12px;
+  }
+  .status-log .hl { color: #E8B600; }
+
+  /* ── KEY INSIGHT ── */
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.82em;
+    color: #888;
+  }
+  .note strong { color: #E8B600; }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    color: #555;
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #1a1a1a;
+    color: #333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    text-align: center;
+  }
+
+  @media (max-width: 640px) {
+    .container { padding: 20px 14px 32px; }
+    h1 { font-size: 1.3em; }
+    .info-grid { grid-template-columns: 1fr; }
+    #stateMachineCanvas { height: 340px; }
+    .controls { gap: 8px; }
+    .speed-ctrl { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Autonomous Camera Lifecycle</h1>
+  <p class="subtitle">Six states, zero operators. The <span>CrashCam Mini</span> state machine from idle to on-air.</p>
+
+  <div class="panel">
+    <div class="panel-label">State Machine</div>
+    <canvas id="stateMachineCanvas"></canvas>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Idle</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#E8B600"></div> Active state</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(232,182,0,0.3)"></div> Visited</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2a5a2a"></div> Transition arrow</div>
+    </div>
+
+    <!-- Info cards -->
+    <div class="info-grid">
+      <div class="info-card" id="infoCamera">
+        <div class="info-card-label">Camera Action</div>
+        <div class="info-card-value" id="valCamera">--</div>
+      </div>
+      <div class="info-card" id="infoSignal">
+        <div class="info-card-label">SDI Output</div>
+        <div class="info-card-value" id="valSignal">--</div>
+      </div>
+      <div class="info-card" id="infoOperator">
+        <div class="info-card-label">Operator Sees</div>
+        <div class="info-card-value" id="valOperator">--</div>
+      </div>
+    </div>
+
+    <div class="status-log" id="statusLog">Press play to cycle through states, or click any state node.</div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="playBtn">PLAY</button>
+      <button class="btn btn-secondary" id="stepBtn">STEP</button>
+      <button class="btn btn-secondary" id="resetBtn">RESET</button>
+      <div class="speed-ctrl">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="1" max="5" value="2" step="1">
+        <span class="speed-val" id="speedVal">2x</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Key insight:</strong> No human is in the loop between trigger and replay. The camera transitions through all six states autonomously. An operator can monitor via SDI output, but the system requires zero intervention to capture, play back, and reset for the next event.
+  </div>
+
+  <footer>ITD-003 / Integrated Design Tools / idtcameras.com</footer>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('stateMachineCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: rect.width, h: rect.height };
+  }
+
+  let W, H;
+  function init() { const s = resize(); W = s.w; H = s.h; }
+  init();
+
+  // ── STATE DEFINITIONS ──
+
+  const states = [
+    {
+      id: 'idle',
+      label: 'IDLE',
+      camera: 'Powered on, sensor standby. Memory clear.',
+      signal: 'Black frame or test pattern.',
+      operator: 'Status LED: solid blue. Camera ready.',
+      color: '#4080D0'
+    },
+    {
+      id: 'armed',
+      label: 'ARMED',
+      camera: 'Sensor active, monitoring for trigger condition.',
+      signal: 'Live preview at low framerate.',
+      operator: 'Status LED: solid green. Waiting for motion.',
+      color: '#40B060'
+    },
+    {
+      id: 'triggered',
+      label: 'TRIGGERED',
+      camera: 'Motion detected. Trigger fires. Buffer capture begins.',
+      signal: 'Live preview continues briefly.',
+      operator: 'Status LED: flashing amber. Trigger fired.',
+      color: '#E8B600'
+    },
+    {
+      id: 'recording',
+      label: 'RECORDING',
+      camera: 'Capturing at 1000 fps, 1920x1080. Writing to buffer.',
+      signal: 'Output frozen on last pre-trigger frame.',
+      operator: 'Status LED: solid red. Recording in progress.',
+      color: '#D94040'
+    },
+    {
+      id: 'playback',
+      label: 'PLAYBACK',
+      camera: 'Buffer readout. Looping recorded clip at 50 Hz.',
+      signal: '3G-SDI 50Hz, 1080p slow-motion loop.',
+      operator: 'Slow-motion replay visible on monitor.',
+      color: '#E8B600'
+    },
+    {
+      id: 'reset',
+      label: 'RESET',
+      camera: 'Clearing buffer. Re-arming trigger system.',
+      signal: 'Brief black, then returns to preview.',
+      operator: 'Status LED cycles blue > green. Ready again.',
+      color: '#4080D0'
+    }
+  ];
+
+  // Layout positions (hexagonal ring)
+  function computePositions() {
+    const cx = W / 2;
+    const cy = H / 2 + 4;
+    const rx = Math.min(W * 0.36, 280);
+    const ry = Math.min(H * 0.34, 160);
+    const n = states.length;
+
+    return states.map((s, i) => {
+      // Arrange in a rounded hexagon, top-center start
+      const angle = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      return {
+        x: cx + Math.cos(angle) * rx,
+        y: cy + Math.sin(angle) * ry
+      };
+    });
+  }
+
+  let positions = computePositions();
+  const NODE_R = 32;
+
+  // ── STATE ──
+
+  let currentState = -1;
+  let visitedStates = new Set();
+  let isPlaying = false;
+  let animTimer = null;
+  let transitionProgress = 0;
+  let transitioning = false;
+  let transitionFrom = -1;
+  let transitionRaf = null;
+
+  // ── DOM REFS ──
+  const playBtn = document.getElementById('playBtn');
+  const stepBtn = document.getElementById('stepBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const speedSlider = document.getElementById('speedSlider');
+  const speedValEl = document.getElementById('speedVal');
+  const statusLog = document.getElementById('statusLog');
+  const infoCards = ['infoCamera', 'infoSignal', 'infoOperator'].map(id => document.getElementById(id));
+  const valCamera = document.getElementById('valCamera');
+  const valSignal = document.getElementById('valSignal');
+  const valOperator = document.getElementById('valOperator');
+
+  function getDelay() {
+    const speed = parseInt(speedSlider.value);
+    return [2000, 1400, 900, 600, 350][speed - 1];
+  }
+
+  speedSlider.addEventListener('input', function() {
+    speedValEl.textContent = this.value + 'x';
+  });
+
+  // ── DRAWING ──
+
+  function drawArrow(fromX, fromY, toX, toY, lit, progress) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const ux = dx / dist;
+    const uy = dy / dist;
+
+    // Start and end offset by node radius
+    const sx = fromX + ux * (NODE_R + 4);
+    const sy = fromY + uy * (NODE_R + 4);
+    const ex = toX - ux * (NODE_R + 8);
+    const ey = toY - uy * (NODE_R + 8);
+
+    // Midpoint with slight curve
+    const midX = (sx + ex) / 2;
+    const midY = (sy + ey) / 2;
+    // Perpendicular offset for curve
+    const perpX = -uy * 14;
+    const perpY = ux * 14;
+    const cpX = midX + perpX;
+    const cpY = midY + perpY;
+
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.quadraticCurveTo(cpX, cpY, ex, ey);
+    ctx.strokeStyle = lit ? 'rgba(232, 182, 0, 0.6)' : '#1e1e1e';
+    ctx.lineWidth = lit ? 2 : 1;
+    ctx.stroke();
+
+    // Arrowhead
+    const t = 0.96;
+    const ax = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cpX + t * t * ex;
+    const ay = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cpY + t * t * ey;
+    const angle = Math.atan2(ey - ay, ex - ax);
+    const aLen = 8;
+
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - aLen * Math.cos(angle - 0.35), ey - aLen * Math.sin(angle - 0.35));
+    ctx.lineTo(ex - aLen * Math.cos(angle + 0.35), ey - aLen * Math.sin(angle + 0.35));
+    ctx.closePath();
+    ctx.fillStyle = lit ? 'rgba(232, 182, 0, 0.6)' : '#1e1e1e';
+    ctx.fill();
+
+    // Animated pulse dot on lit arrow
+    if (lit && progress > 0) {
+      const pt = progress;
+      const px = (1 - pt) * (1 - pt) * sx + 2 * (1 - pt) * pt * cpX + pt * pt * ex;
+      const py = (1 - pt) * (1 - pt) * sy + 2 * (1 - pt) * pt * cpY + pt * pt * ey;
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#E8B600';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(232, 182, 0, 0.2)';
+      ctx.fill();
+    }
+  }
+
+  function drawNode(x, y, state, index) {
+    const isCurrent = index === currentState;
+    const isVisited = visitedStates.has(index);
+    const baseColor = state.color;
+
+    // Glow
+    if (isCurrent) {
+      ctx.beginPath();
+      ctx.arc(x, y, NODE_R + 12, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(x, y, NODE_R, x, y, NODE_R + 16);
+      grad.addColorStop(0, baseColor + '30');
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(x, y, NODE_R, 0, Math.PI * 2);
+    if (isCurrent) {
+      ctx.fillStyle = baseColor + '20';
+      ctx.fill();
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 2.5;
+    } else if (isVisited) {
+      ctx.fillStyle = baseColor + '0a';
+      ctx.fill();
+      ctx.strokeStyle = baseColor + '40';
+      ctx.lineWidth = 1.5;
+    } else {
+      ctx.fillStyle = '#141414';
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+    }
+    ctx.stroke();
+
+    // State number
+    ctx.font = '600 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = isCurrent ? baseColor : (isVisited ? baseColor + '60' : '#444');
+    ctx.fillText(index + 1, x, y - 5);
+
+    // Label
+    ctx.font = '500 8.5px "JetBrains Mono", monospace';
+    ctx.fillStyle = isCurrent ? '#e0e0e0' : (isVisited ? '#777' : '#444');
+    ctx.fillText(state.label, x, y + 9);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw arrows (each state connects to the next, last connects to first via armed)
+    for (let i = 0; i < states.length; i++) {
+      const next = (i + 1) % states.length;
+      // Arrow is "lit" if we just transitioned from i to next
+      const isTransitionArrow = transitioning && transitionFrom === i && currentState === next;
+      const isVisitedArrow = visitedStates.has(i) && visitedStates.has(next) && !isTransitionArrow;
+
+      drawArrow(
+        positions[i].x, positions[i].y,
+        positions[next].x, positions[next].y,
+        isTransitionArrow || isVisitedArrow,
+        isTransitionArrow ? transitionProgress : 0
+      );
+    }
+
+    // Reset arrow: from Reset back to Armed (index 5 -> 1), shown as a special shortcut
+    // Actually the main loop already connects 5->0 (Reset->Idle).
+    // The real lifecycle skips Idle on repeat: Reset->Armed. Draw this as a secondary arrow.
+    const resetIdx = 5;
+    const armedIdx = 1;
+    const isResetArrow = transitioning && transitionFrom === resetIdx && currentState === armedIdx;
+    const isResetVisited = visitedStates.has(resetIdx) && visitedStates.has(armedIdx) && currentState >= armedIdx;
+
+    if (isResetArrow || isResetVisited || currentState >= resetIdx) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      drawArrow(
+        positions[resetIdx].x, positions[resetIdx].y,
+        positions[armedIdx].x, positions[armedIdx].y,
+        isResetArrow || isResetVisited,
+        isResetArrow ? transitionProgress : 0
+      );
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Label the shortcut
+      const mx = (positions[resetIdx].x + positions[armedIdx].x) / 2 - 20;
+      const my = (positions[resetIdx].y + positions[armedIdx].y) / 2;
+      ctx.font = '500 7.5px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#444';
+      ctx.fillText('RE-ARM', mx, my);
+    }
+
+    // Draw nodes on top
+    for (let i = 0; i < states.length; i++) {
+      drawNode(positions[i].x, positions[i].y, states[i], i);
+    }
+
+    // "No human in the loop" badge
+    if (currentState >= 2 && currentState <= 5) {
+      ctx.font = '600 8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(232, 182, 0, 0.3)';
+      ctx.fillText('AUTONOMOUS', W / 2, H - 12);
+    }
+  }
+
+  // ── STATE TRANSITIONS ──
+
+  function updateInfo(idx) {
+    if (idx < 0) {
+      valCamera.textContent = '--';
+      valSignal.textContent = '--';
+      valOperator.textContent = '--';
+      infoCards.forEach(c => c.classList.remove('active'));
+      return;
+    }
+    const s = states[idx];
+    valCamera.textContent = s.camera;
+    valSignal.textContent = s.signal;
+    valOperator.textContent = s.operator;
+    infoCards.forEach(c => c.classList.add('active'));
+  }
+
+  function goToState(idx, animate) {
+    const prevState = currentState;
+    transitionFrom = prevState;
+    currentState = idx;
+    visitedStates.add(idx);
+
+    updateInfo(idx);
+    statusLog.innerHTML = 'State ' + (idx + 1) + ': <span class="hl">' + states[idx].label + '</span>';
+
+    if (animate && prevState >= 0) {
+      // Animate transition dot
+      transitioning = true;
+      transitionProgress = 0;
+      const startTime = performance.now();
+      const duration = 400;
+
+      function animateTransition(now) {
+        transitionProgress = Math.min((now - startTime) / duration, 1);
+        draw();
+        if (transitionProgress < 1) {
+          transitionRaf = requestAnimationFrame(animateTransition);
+        } else {
+          transitioning = false;
+          draw();
+        }
+      }
+      cancelAnimationFrame(transitionRaf);
+      transitionRaf = requestAnimationFrame(animateTransition);
+    } else {
+      draw();
+    }
+  }
+
+  function stepForward() {
+    if (currentState < 0) {
+      goToState(0, false);
+    } else {
+      const next = currentState === 5 ? 1 : currentState + 1;  // Reset loops to Armed, not Idle
+      goToState(next, true);
+    }
+  }
+
+  function resetMachine() {
+    clearTimeout(animTimer);
+    cancelAnimationFrame(transitionRaf);
+    animTimer = null;
+    isPlaying = false;
+    currentState = -1;
+    transitionFrom = -1;
+    transitioning = false;
+    transitionProgress = 0;
+    visitedStates.clear();
+    updateInfo(-1);
+    statusLog.textContent = 'Press play to cycle through states, or click any state node.';
+    playBtn.textContent = 'PLAY';
+    draw();
+  }
+
+  function playSequence() {
+    if (currentState >= 5) {
+      // Full cycle done, loop back to Armed
+      goToState(1, true);
+      animTimer = setTimeout(playSequence, getDelay());
+      return;
+    }
+    stepForward();
+    if (currentState < 5) {
+      animTimer = setTimeout(playSequence, getDelay());
+    } else {
+      // Pause at Reset, then loop
+      animTimer = setTimeout(() => {
+        goToState(1, true);
+        animTimer = setTimeout(playSequence, getDelay());
+      }, getDelay() * 1.5);
+    }
+  }
+
+  playBtn.addEventListener('click', function() {
+    if (isPlaying) {
+      clearTimeout(animTimer);
+      isPlaying = false;
+      playBtn.textContent = 'PLAY';
+      return;
+    }
+    isPlaying = true;
+    playBtn.textContent = 'PAUSE';
+    if (currentState < 0) {
+      goToState(0, false);
+      animTimer = setTimeout(playSequence, getDelay());
+    } else {
+      playSequence();
+    }
+  });
+
+  stepBtn.addEventListener('click', function() {
+    if (isPlaying) {
+      clearTimeout(animTimer);
+      isPlaying = false;
+      playBtn.textContent = 'PLAY';
+    }
+    stepForward();
+  });
+
+  resetBtn.addEventListener('click', resetMachine);
+
+  // ── CLICK ON NODES ──
+
+  canvas.addEventListener('click', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    for (let i = 0; i < positions.length; i++) {
+      const dx = mx - positions[i].x;
+      const dy = my - positions[i].y;
+      if (dx * dx + dy * dy < (NODE_R + 8) * (NODE_R + 8)) {
+        if (isPlaying) {
+          clearTimeout(animTimer);
+          isPlaying = false;
+          playBtn.textContent = 'PLAY';
+        }
+        goToState(i, true);
+        break;
+      }
+    }
+  });
+
+  // ── HOVER CURSOR ──
+
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    let over = false;
+    for (let i = 0; i < positions.length; i++) {
+      const dx = mx - positions[i].x;
+      const dy = my - positions[i].y;
+      if (dx * dx + dy * dy < (NODE_R + 8) * (NODE_R + 8)) {
+        over = true;
+        break;
+      }
+    }
+    canvas.style.cursor = over ? 'pointer' : 'default';
+  });
+
+  // ── RESIZE ──
+
+  window.addEventListener('resize', function() {
+    init();
+    positions = computePositions();
+    draw();
+  });
+
+  // Initial draw
+  draw();
+
+})();
+</script>
+</body>
+</html>

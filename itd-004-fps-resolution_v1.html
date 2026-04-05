@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-004: FPS vs Resolution Tradeoff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  /* ── SCATTER PLOT ── */
+  #scatterCanvas {
+    width: 100%;
+    height: 400px;
+    display: block;
+    border-radius: 6px;
+    cursor: crosshair;
+  }
+
+  /* ── CAMERA FILTER CHIPS ── */
+  .filter-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #222;
+    background: #141414;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .chip .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .chip.active {
+    border-color: var(--cam-color);
+    color: #ccc;
+    background: rgba(255,255,255,0.04);
+  }
+  .chip.active .dot { box-shadow: 0 0 6px var(--cam-color); }
+
+  /* ── SLIDERS ── */
+  .slider-row {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+  .slider-group {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .slider-group label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    color: #555;
+    min-width: 32px;
+  }
+  .slider-group input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: #E8B600;
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* ── DETAIL PANEL ── */
+  .detail-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .detail-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .detail-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 8px;
+  }
+
+  /* Sensor area viz */
+  #sensorCanvas {
+    width: 100%;
+    height: 160px;
+    display: block;
+    border-radius: 4px;
+  }
+
+  /* Results list */
+  .results-list {
+    max-height: 160px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #2a2a2a #141414;
+  }
+  .results-list::-webkit-scrollbar { width: 4px; }
+  .results-list::-webkit-scrollbar-track { background: #141414; }
+  .results-list::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+  .result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #1a1a1a;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    cursor: pointer;
+    transition: background 0.15s;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .result-item:hover { background: rgba(232,182,0,0.04); }
+  .result-item.selected { background: rgba(232,182,0,0.08); }
+  .result-item .ri-name { color: #999; }
+  .result-item .ri-mode { color: #666; }
+  .result-item .ri-spec {
+    color: #555;
+    font-size: 0.92em;
+  }
+  .result-item .ri-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-right: 6px;
+  }
+  .result-item .ri-left {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* ── NOTE ── */
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.82em;
+    color: #888;
+  }
+  .note strong { color: #E8B600; }
+
+  /* ── TOOLTIP ── */
+  .tooltip {
+    position: fixed;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #ccc;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 100;
+    max-width: 220px;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .tt-cam { color: #E8B600; font-weight: 600; }
+  .tooltip .tt-mode { color: #888; }
+  .tooltip .tt-spec { color: #aaa; margin-top: 2px; }
+
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #1a1a1a;
+    color: #333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    text-align: center;
+  }
+
+  @media (max-width: 640px) {
+    .container { padding: 20px 14px 32px; }
+    h1 { font-size: 1.3em; }
+    .slider-row { flex-direction: column; gap: 10px; }
+    .detail-panel { grid-template-columns: 1fr; }
+    #scatterCanvas { height: 320px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>FPS vs Resolution Tradeoff</h1>
+  <p class="subtitle">Every high-speed sensor trades pixels for speed. This is how IDT cameras map that boundary.</p>
+
+  <div class="panel">
+    <div class="panel-label">Camera Modes Scatter Plot</div>
+
+    <!-- Camera filter chips -->
+    <div class="filter-row" id="filterRow"></div>
+
+    <!-- Threshold sliders -->
+    <div class="slider-row">
+      <div class="slider-group">
+        <label>Min FPS</label>
+        <input type="range" id="minFps" min="0" max="100" value="0">
+        <span class="slider-val" id="minFpsVal">0</span>
+      </div>
+      <div class="slider-group">
+        <label>Min Res</label>
+        <input type="range" id="minRes" min="0" max="100" value="0">
+        <span class="slider-val" id="minResVal">0</span>
+      </div>
+    </div>
+
+    <!-- Scatter -->
+    <canvas id="scatterCanvas"></canvas>
+  </div>
+
+  <!-- Detail panels -->
+  <div class="detail-panel">
+    <div class="detail-card">
+      <div class="detail-card-label">Sensor Active Area</div>
+      <canvas id="sensorCanvas"></canvas>
+    </div>
+    <div class="detail-card">
+      <div class="detail-card-label">Matching Modes</div>
+      <div class="results-list" id="resultsList"></div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>The physics:</strong> A CMOS sensor reads pixels row by row. Fewer rows means faster readout, which means higher frame rates. Reducing resolution (cropping the active sensor area) is the primary mechanism for increasing speed. Every mode in this chart represents a specific crop of the full sensor, chosen to balance spatial detail against temporal resolution for a given application.
+  </div>
+
+  <footer>ITD-004 / Integrated Design Tools / idtcameras.com</footer>
+</div>
+
+<div class="tooltip" id="tooltip">
+  <div class="tt-cam"></div>
+  <div class="tt-mode"></div>
+  <div class="tt-spec"></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── CAMERA DATA ──
+  // 7 cameras, curated from the IDT product line to show the full tradeoff envelope
+
+  const cameras = [
+    {
+      name: 'Helios 8K\u00b2',
+      color: '#9966CC',
+      modes: [
+        { mode: '8K\u00b2', w: 8192, h: 8192, fps: 90 },
+        { mode: '8K UHD', w: 7680, h: 4320, fps: 180 }
+      ]
+    },
+    {
+      name: 'Galileo',
+      color: '#4080D0',
+      modes: [
+        { mode: '6K', w: 6400, h: 5120, fps: 1000 },
+        { mode: '5K Veloce', w: 5120, h: 3456, fps: 889 },
+        { mode: '5K', w: 5120, h: 2448, fps: 2000 },
+        { mode: '3K', w: 3200, h: 2560, fps: 3675 }
+      ]
+    },
+    {
+      name: 'Phoenix',
+      color: '#D97020',
+      modes: [
+        { mode: 'UHD', w: 3840, h: 2880, fps: 3788 },
+        { mode: 'HD', w: 1920, h: 1440, fps: 15140 }
+      ]
+    },
+    {
+      name: 'XS II',
+      color: '#40B060',
+      modes: [
+        { mode: '5K', w: 5120, h: 2880, fps: 400 },
+        { mode: '4K Veloce', w: 3840, h: 2160, fps: 1000 },
+        { mode: '3530', w: 2560, h: 1440, fps: 3000 },
+        { mode: 'HD', w: 1920, h: 1080, fps: 5850 },
+        { mode: '1550', w: 1440, h: 1024, fps: 4850 }
+      ]
+    },
+    {
+      name: 'XSM',
+      color: '#50B8A0',
+      modes: [
+        { mode: '5K', w: 5120, h: 2880, fps: 400 },
+        { mode: '4K Veloce', w: 3840, h: 2160, fps: 1000 },
+        { mode: '3530', w: 2560, h: 1440, fps: 2350 },
+        { mode: 'HD', w: 1920, h: 1080, fps: 5350 },
+        { mode: '1540', w: 1440, h: 1024, fps: 4700 }
+      ]
+    },
+    {
+      name: 'OS II Gold',
+      color: '#E8B600',
+      modes: [
+        { mode: '60XX', w: 6400, h: 5120, fps: 480 },
+        { mode: '50XX', w: 5120, h: 2448, fps: 1000 },
+        { mode: '35XX', w: 2560, h: 1520, fps: 3450 }
+      ]
+    },
+    {
+      name: 'CrashCam Mini',
+      color: '#D94040',
+      modes: [
+        { mode: '4K Veloce', w: 3840, h: 2160, fps: 1000 },
+        { mode: '3530', w: 2560, h: 1440, fps: 3000 },
+        { mode: '3510', w: 2560, h: 1440, fps: 1000 },
+        { mode: 'HD', w: 1920, h: 1080, fps: 5850 },
+        { mode: '1550', w: 1440, h: 1024, fps: 4850 },
+        { mode: '1520', w: 1440, h: 1024, fps: 2000 }
+      ]
+    }
+  ];
+
+  // Flatten all modes
+  const allModes = [];
+  cameras.forEach(cam => {
+    cam.modes.forEach(m => {
+      allModes.push({
+        camera: cam.name,
+        color: cam.color,
+        mode: m.mode,
+        w: m.w,
+        h: m.h,
+        fps: m.fps,
+        megapixels: (m.w * m.h) / 1e6
+      });
+    });
+  });
+
+  // ── SCATTER PLOT ──
+
+  const scatterCanvas = document.getElementById('scatterCanvas');
+  const sCtx = scatterCanvas.getContext('2d');
+  const sensorCanvas = document.getElementById('sensorCanvas');
+  const senCtx = sensorCanvas.getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+  const resultsList = document.getElementById('resultsList');
+  const filterRow = document.getElementById('filterRow');
+
+  const dpr = window.devicePixelRatio || 1;
+
+  // Chart margins
+  const margin = { top: 20, right: 24, bottom: 40, left: 56 };
+
+  let SW, SH, plotW, plotH;
+  let activeCameras = new Set(cameras.map(c => c.name));
+  let hoveredMode = null;
+  let selectedMode = null;
+
+  // FPS slider maps 0-100 to log scale
+  const FPS_MIN = 50;
+  const FPS_MAX = 20000;
+  const RES_MIN = 0.5;  // megapixels
+  const RES_MAX = 70;
+
+  function logLerp(min, max, t) {
+    return Math.exp(Math.log(min) + t * (Math.log(max) - Math.log(min)));
+  }
+
+  let filterMinFps = FPS_MIN;
+  let filterMinRes = RES_MIN;
+
+  const minFpsSlider = document.getElementById('minFps');
+  const minResSlider = document.getElementById('minRes');
+  const minFpsVal = document.getElementById('minFpsVal');
+  const minResVal = document.getElementById('minResVal');
+
+  function updateSliderLabels() {
+    filterMinFps = logLerp(FPS_MIN, FPS_MAX, minFpsSlider.value / 100);
+    filterMinRes = logLerp(RES_MIN, RES_MAX, minResSlider.value / 100);
+    minFpsVal.textContent = filterMinFps < 1000 ? Math.round(filterMinFps) + ' fps' : (filterMinFps / 1000).toFixed(1) + 'K fps';
+    minResVal.textContent = filterMinRes < 1 ? filterMinRes.toFixed(1) + ' MP' : filterMinRes.toFixed(1) + ' MP';
+  }
+
+  minFpsSlider.addEventListener('input', () => { updateSliderLabels(); drawAll(); });
+  minResSlider.addEventListener('input', () => { updateSliderLabels(); drawAll(); });
+  updateSliderLabels();
+
+  // ── FILTER CHIPS ──
+
+  cameras.forEach(cam => {
+    const chip = document.createElement('button');
+    chip.className = 'chip active';
+    chip.style.setProperty('--cam-color', cam.color);
+    chip.innerHTML = '<span class="dot" style="background:' + cam.color + '"></span>' + cam.name;
+    chip.addEventListener('click', () => {
+      if (activeCameras.has(cam.name)) {
+        activeCameras.delete(cam.name);
+        chip.classList.remove('active');
+      } else {
+        activeCameras.add(cam.name);
+        chip.classList.add('active');
+      }
+      drawAll();
+    });
+    filterRow.appendChild(chip);
+  });
+
+  // ── COORDINATE MAPPING ──
+
+  function xFromMp(mp) {
+    return margin.left + ((Math.log10(mp) - Math.log10(RES_MIN)) / (Math.log10(RES_MAX) - Math.log10(RES_MIN))) * plotW;
+  }
+  function yFromFps(fps) {
+    return margin.top + plotH - ((Math.log10(fps) - Math.log10(FPS_MIN)) / (Math.log10(FPS_MAX) - Math.log10(FPS_MIN))) * plotH;
+  }
+
+  function resizeScatter() {
+    const rect = scatterCanvas.getBoundingClientRect();
+    scatterCanvas.width = rect.width * dpr;
+    scatterCanvas.height = rect.height * dpr;
+    sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    SW = rect.width;
+    SH = rect.height;
+    plotW = SW - margin.left - margin.right;
+    plotH = SH - margin.top - margin.bottom;
+  }
+
+  function resizeSensor() {
+    const rect = sensorCanvas.getBoundingClientRect();
+    sensorCanvas.width = rect.width * dpr;
+    sensorCanvas.height = rect.height * dpr;
+    senCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── DRAW SCATTER ──
+
+  function drawScatter() {
+    resizeScatter();
+    sCtx.clearRect(0, 0, SW, SH);
+
+    // Background
+    sCtx.fillStyle = '#0c0c0c';
+    sCtx.fillRect(0, 0, SW, SH);
+
+    // Grid
+    sCtx.strokeStyle = '#1a1a1a';
+    sCtx.lineWidth = 1;
+
+    // X grid (megapixels): 1, 2, 5, 10, 20, 50
+    const xTicks = [0.5, 1, 2, 5, 10, 20, 50];
+    xTicks.forEach(mp => {
+      const x = xFromMp(mp);
+      if (x >= margin.left && x <= margin.left + plotW) {
+        sCtx.beginPath();
+        sCtx.moveTo(x, margin.top);
+        sCtx.lineTo(x, margin.top + plotH);
+        sCtx.stroke();
+        // Label
+        sCtx.font = '9px "JetBrains Mono", monospace';
+        sCtx.fillStyle = '#444';
+        sCtx.textAlign = 'center';
+        sCtx.fillText(mp < 1 ? mp + '' : mp + ' MP', x, margin.top + plotH + 16);
+      }
+    });
+
+    // Y grid (fps): 100, 500, 1000, 2000, 5000, 10000
+    const yTicks = [100, 200, 500, 1000, 2000, 5000, 10000, 15000];
+    yTicks.forEach(fps => {
+      const y = yFromFps(fps);
+      if (y >= margin.top && y <= margin.top + plotH) {
+        sCtx.beginPath();
+        sCtx.moveTo(margin.left, y);
+        sCtx.lineTo(margin.left + plotW, y);
+        sCtx.stroke();
+        // Label
+        sCtx.font = '9px "JetBrains Mono", monospace';
+        sCtx.fillStyle = '#444';
+        sCtx.textAlign = 'right';
+        sCtx.textBaseline = 'middle';
+        const label = fps >= 1000 ? (fps / 1000) + 'K' : fps + '';
+        sCtx.fillText(label, margin.left - 8, y);
+      }
+    });
+
+    // Axis labels
+    sCtx.font = '600 9px "JetBrains Mono", monospace';
+    sCtx.fillStyle = '#555';
+    sCtx.textAlign = 'center';
+    sCtx.textBaseline = 'top';
+    sCtx.fillText('RESOLUTION (MEGAPIXELS)', margin.left + plotW / 2, SH - 8);
+
+    sCtx.save();
+    sCtx.translate(12, margin.top + plotH / 2);
+    sCtx.rotate(-Math.PI / 2);
+    sCtx.textAlign = 'center';
+    sCtx.textBaseline = 'top';
+    sCtx.fillText('FRAME RATE (FPS)', 0, 0);
+    sCtx.restore();
+
+    // Filter threshold lines
+    if (filterMinFps > FPS_MIN * 1.1) {
+      const fy = yFromFps(filterMinFps);
+      sCtx.strokeStyle = 'rgba(232, 182, 0, 0.2)';
+      sCtx.setLineDash([4, 4]);
+      sCtx.beginPath();
+      sCtx.moveTo(margin.left, fy);
+      sCtx.lineTo(margin.left + plotW, fy);
+      sCtx.stroke();
+      sCtx.setLineDash([]);
+    }
+    if (filterMinRes > RES_MIN * 1.2) {
+      const fx = xFromMp(filterMinRes);
+      sCtx.strokeStyle = 'rgba(232, 182, 0, 0.2)';
+      sCtx.setLineDash([4, 4]);
+      sCtx.beginPath();
+      sCtx.moveTo(fx, margin.top);
+      sCtx.lineTo(fx, margin.top + plotH);
+      sCtx.stroke();
+      sCtx.setLineDash([]);
+    }
+
+    // Plot points
+    const visible = [];
+    allModes.forEach(m => {
+      if (!activeCameras.has(m.camera)) return;
+      const meetsFilter = m.fps >= filterMinFps && m.megapixels >= filterMinRes;
+      const x = xFromMp(m.megapixels);
+      const y = yFromFps(m.fps);
+
+      if (x < margin.left || x > margin.left + plotW || y < margin.top || y > margin.top + plotH) return;
+
+      const isHovered = hoveredMode === m;
+      const isSelected = selectedMode === m;
+      const dimmed = !meetsFilter;
+
+      // Glow
+      if (isHovered || isSelected) {
+        sCtx.beginPath();
+        sCtx.arc(x, y, 16, 0, Math.PI * 2);
+        const grad = sCtx.createRadialGradient(x, y, 4, x, y, 16);
+        grad.addColorStop(0, m.color + '40');
+        grad.addColorStop(1, 'transparent');
+        sCtx.fillStyle = grad;
+        sCtx.fill();
+      }
+
+      // Point
+      const r = isHovered || isSelected ? 6 : 4.5;
+      sCtx.beginPath();
+      sCtx.arc(x, y, r, 0, Math.PI * 2);
+      sCtx.fillStyle = dimmed ? (m.color + '30') : m.color;
+      sCtx.fill();
+
+      if (isSelected) {
+        sCtx.strokeStyle = '#fff';
+        sCtx.lineWidth = 1.5;
+        sCtx.stroke();
+      }
+
+      visible.push({ ...m, x, y, meetsFilter });
+    });
+
+    return visible;
+  }
+
+  // ── DRAW SENSOR AREA ──
+
+  function drawSensor() {
+    resizeSensor();
+    const sw = sensorCanvas.getBoundingClientRect().width;
+    const sh = sensorCanvas.getBoundingClientRect().height;
+    senCtx.clearRect(0, 0, sw, sh);
+    senCtx.fillStyle = '#0c0c0c';
+    senCtx.fillRect(0, 0, sw, sh);
+
+    if (!selectedMode && !hoveredMode) {
+      senCtx.font = '10px "JetBrains Mono", monospace';
+      senCtx.fillStyle = '#333';
+      senCtx.textAlign = 'center';
+      senCtx.textBaseline = 'middle';
+      senCtx.fillText('Select a mode to see sensor area', sw / 2, sh / 2);
+      return;
+    }
+
+    const m = hoveredMode || selectedMode;
+
+    // Find the camera's max resolution for reference
+    const cam = cameras.find(c => c.name === m.camera);
+    const maxW = Math.max(...cam.modes.map(mo => mo.w));
+    const maxH = Math.max(...cam.modes.map(mo => mo.h));
+
+    const pad = 16;
+    const availW = sw - pad * 2;
+    const availH = sh - pad * 2 - 20;
+    const scale = Math.min(availW / maxW, availH / maxH);
+
+    const fullW = maxW * scale;
+    const fullH = maxH * scale;
+    const ox = (sw - fullW) / 2;
+    const oy = (sh - fullH) / 2 - 4;
+
+    // Full sensor outline
+    senCtx.strokeStyle = '#2a2a2a';
+    senCtx.lineWidth = 1;
+    senCtx.strokeRect(ox, oy, fullW, fullH);
+
+    // Full sensor label
+    senCtx.font = '8px "JetBrains Mono", monospace';
+    senCtx.fillStyle = '#333';
+    senCtx.textAlign = 'center';
+    senCtx.fillText(maxW + ' x ' + maxH + ' (full)', sw / 2, oy + fullH + 12);
+
+    // Active area (centered crop)
+    const activeW = m.w * scale;
+    const activeH = m.h * scale;
+    const ax = ox + (fullW - activeW) / 2;
+    const ay = oy + (fullH - activeH) / 2;
+
+    senCtx.fillStyle = m.color + '18';
+    senCtx.fillRect(ax, ay, activeW, activeH);
+    senCtx.strokeStyle = m.color;
+    senCtx.lineWidth = 1.5;
+    senCtx.strokeRect(ax, ay, activeW, activeH);
+
+    // Active label
+    senCtx.font = '600 9px "JetBrains Mono", monospace';
+    senCtx.fillStyle = m.color;
+    senCtx.textAlign = 'center';
+    senCtx.textBaseline = 'middle';
+    senCtx.fillText(m.w + ' x ' + m.h, ax + activeW / 2, ay + activeH / 2 - 6);
+    senCtx.font = '9px "JetBrains Mono", monospace';
+    senCtx.fillStyle = '#999';
+    senCtx.fillText(m.fps.toLocaleString() + ' fps', ax + activeW / 2, ay + activeH / 2 + 8);
+
+    // Usage percentage
+    const pct = ((m.w * m.h) / (maxW * maxH) * 100).toFixed(0);
+    senCtx.font = '8px "JetBrains Mono", monospace';
+    senCtx.fillStyle = '#555';
+    senCtx.textAlign = 'right';
+    senCtx.textBaseline = 'top';
+    senCtx.fillText(pct + '% of sensor', ox + fullW, oy - 10);
+  }
+
+  // ── RESULTS LIST ──
+
+  function updateResults(visibleModes) {
+    const filtered = allModes.filter(m =>
+      activeCameras.has(m.camera) &&
+      m.fps >= filterMinFps &&
+      m.megapixels >= filterMinRes
+    );
+
+    // Sort by fps descending
+    filtered.sort((a, b) => b.fps - a.fps);
+
+    resultsList.innerHTML = '';
+    if (filtered.length === 0) {
+      resultsList.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:0.72em;color:#444;padding:8px 0;">No modes match current filters.</div>';
+      return;
+    }
+
+    filtered.forEach(m => {
+      const item = document.createElement('div');
+      item.className = 'result-item' + (selectedMode === m ? ' selected' : '');
+      item.innerHTML =
+        '<div class="ri-left"><span class="ri-dot" style="background:' + m.color + '"></span>' +
+        '<span class="ri-name">' + m.camera + '</span>&nbsp;<span class="ri-mode">' + m.mode + '</span></div>' +
+        '<span class="ri-spec">' + m.w + 'x' + m.h + ' @ ' + m.fps.toLocaleString() + '</span>';
+      item.addEventListener('click', () => {
+        selectedMode = m;
+        drawAll();
+      });
+      item.addEventListener('mouseenter', () => {
+        hoveredMode = m;
+        drawSensor();
+      });
+      item.addEventListener('mouseleave', () => {
+        hoveredMode = null;
+        drawSensor();
+      });
+      resultsList.appendChild(item);
+    });
+  }
+
+  // ── TOOLTIP ──
+
+  let currentVisible = [];
+
+  scatterCanvas.addEventListener('mousemove', function(e) {
+    const rect = scatterCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    let found = null;
+    let minDist = 20;
+    currentVisible.forEach(m => {
+      const dx = mx - m.x;
+      const dy = my - m.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        found = m;
+      }
+    });
+
+    if (found) {
+      hoveredMode = allModes.find(am => am.camera === found.camera && am.mode === found.mode);
+      tooltip.querySelector('.tt-cam').textContent = found.camera;
+      tooltip.querySelector('.tt-mode').textContent = found.mode;
+      tooltip.querySelector('.tt-spec').textContent = found.w + 'x' + found.h + ' @ ' + found.fps.toLocaleString() + ' fps (' + found.megapixels.toFixed(1) + ' MP)';
+      tooltip.classList.add('show');
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+      scatterCanvas.style.cursor = 'pointer';
+      drawSensor();
+    } else {
+      if (hoveredMode) {
+        hoveredMode = null;
+        drawSensor();
+      }
+      tooltip.classList.remove('show');
+      scatterCanvas.style.cursor = 'crosshair';
+    }
+
+    // Redraw for hover highlight
+    drawScatter();
+  });
+
+  scatterCanvas.addEventListener('mouseleave', function() {
+    hoveredMode = null;
+    tooltip.classList.remove('show');
+    drawScatter();
+    drawSensor();
+  });
+
+  scatterCanvas.addEventListener('click', function(e) {
+    const rect = scatterCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    let found = null;
+    let minDist = 20;
+    currentVisible.forEach(m => {
+      const dx = mx - m.x;
+      const dy = my - m.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        found = m;
+      }
+    });
+
+    if (found) {
+      selectedMode = allModes.find(am => am.camera === found.camera && am.mode === found.mode);
+    } else {
+      selectedMode = null;
+    }
+    drawAll();
+  });
+
+  // ── MASTER DRAW ──
+
+  function drawAll() {
+    currentVisible = drawScatter();
+    drawSensor();
+    updateResults(currentVisible);
+  }
+
+  window.addEventListener('resize', drawAll);
+  drawAll();
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<h2>Multi-Camera Geometry for Stereo and PIV Flow Measurement</h2>
+
+<p><em>By Ciamac Parhizi</em></p>
+
+<h3>The Problem: One Camera Cannot Measure Depth</h3>
+
+<p>A single high-speed camera produces a flat image. It can measure displacement in two dimensions (across the frame), but it has no information about motion toward or away from the camera. In particle image velocimetry (PIV), this means a single-camera setup can only resolve two components of velocity in a single plane. For many fluid dynamics experiments, the third component (out-of-plane motion) contains the data that matters most: vortex structures, recirculation zones, turbulent energy cascades. Recovering that third dimension requires a second viewpoint, and recovering volumetric 3D fields requires more.</p>
+
+<h3>The IDT Approach: Stereo and Volumetric Camera Configurations</h3>
+
+<p>IDT cameras support synchronized multi-camera operation through shared trigger and timing signals. A stereo PIV setup uses two cameras viewing the same measurement plane from different angles. The angular separation between cameras creates a triangulation baseline that encodes depth information. Post-processing software correlates particle displacements across both views to reconstruct all three velocity components in the illuminated plane.</p>
+
+<iframe src="/itd/itd-006-stereo-piv.html" width="100%" height="600" frameborder="0" style="border:none; border-radius:4px;"></iframe>
+
+<p>The interactive diagram above shows a bird's-eye view of a flow channel with draggable camera positions. The baseline slider controls the spacing between cameras. Wider baseline increases depth resolution (the triangulation angle grows), but reduces the overlap region where both cameras see the same particles. Toggle to volumetric mode to see a four-camera configuration that enables full 3D reconstruction of the flow field.</p>
+
+<h3>Baseline Distance and Depth Resolution</h3>
+
+<p>The relationship between camera spacing and measurement quality is geometric. Depth resolution scales with the tangent of the half-angle between camera viewing directions. At narrow baselines, a small change in particle depth produces a small disparity between the two images, making it difficult to resolve. At wider baselines, the same depth change produces a larger disparity, improving measurement precision. The tradeoff is the overlap region. As cameras move apart, the volume visible to both cameras shrinks. The optimal baseline for a given experiment balances depth sensitivity against measurement volume size.</p>
+
+<h3>From Stereo to Volumetric</h3>
+
+<p>Adding a third and fourth camera at orthogonal positions enables tomographic PIV, where the entire illuminated volume is reconstructed in three dimensions. Instead of measuring velocity in a single plane, volumetric setups capture the full 3D velocity field across a volume of fluid. This requires precise calibration of all camera positions and viewing angles, but the physics of image correlation remain the same. IDT's Galileo and XS II cameras are commonly used in these configurations, with their high pixel counts providing the spatial resolution needed for accurate particle tracking across overlapping fields of view.</p>

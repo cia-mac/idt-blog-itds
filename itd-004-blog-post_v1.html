@@ -1,0 +1,23 @@
+<h2>FPS vs Resolution: The Fundamental Tradeoff in High-Speed Imaging</h2>
+
+<p><em>By Ciamac Parhizi</em></p>
+
+<h3>The Problem: You Cannot Have Both at Once</h3>
+
+<p>Every high-speed camera sensor has a fixed pixel readout rate. This is a hardware constraint. The sensor reads pixels row by row, and the total time to read all rows determines the maximum frame rate at full resolution. If a sensor reads 5 billion pixels per second and the full frame contains 32 million pixels, the ceiling is roughly 150 frames per second at full resolution. To go faster, the sensor must read fewer pixels. This is not a limitation of IDT cameras specifically. It is a property of CMOS image sensors in general. The question is how a camera manufacturer maps that physical constraint into useful operating modes.</p>
+
+<h3>The IDT Approach: Discrete Modes Across the Envelope</h3>
+
+<p>IDT cameras offer multiple resolution and frame rate combinations, each representing a specific crop of the full sensor area. Reducing the active area means fewer rows to read, which means higher frame rates. A Galileo at full 6K resolution (6400 x 5120) captures at 1,000 fps. Crop to 3K (3200 x 2560) and it reaches 3,675 fps. The Phoenix takes this further: its HD mode (1920 x 1440) runs at 15,140 fps, using roughly a quarter of the sensor area compared to its UHD mode at 3,788 fps.</p>
+
+<iframe src="/itd/itd-004-fps-resolution.html" width="100%" height="600" frameborder="0" style="border:none; border-radius:4px;"></iframe>
+
+<p>The interactive chart above plots every mode from seven IDT cameras on a log-scale scatter plot. Use the filter sliders to set minimum thresholds for frame rate and resolution, and toggle individual cameras on or off. Clicking any data point shows the corresponding sensor crop, illustrating exactly how much of the sensor each mode uses.</p>
+
+<h3>Choosing the Right Point on the Curve</h3>
+
+<p>Application requirements determine where on the tradeoff curve a user should operate. Crash testing typically needs full spatial coverage of the deformation zone, so resolution takes priority. A Galileo at 5K and 2,000 fps captures enough detail to measure crumple geometry across the full vehicle width. Ballistics and fluid dynamics demand the opposite: frame rates above 5,000 fps to freeze supersonic events, with resolution secondary. A Phoenix in HD mode at 15,140 fps resolves individual shock wave frames. Broadcast slow-motion sits in the middle, where 1080p at 1,000 fps provides broadcast-standard resolution with sufficient temporal detail for replay.</p>
+
+<h3>The Sensor Area Connection</h3>
+
+<p>The sensor area visualization in the diagram makes the tradeoff tangible. At full resolution, the entire sensor is active. Each step up in frame rate corresponds to a visible reduction in the active rectangle. This is not digital zoom or downsampling. The camera physically reads fewer rows, which is why the speed increase is real and the image quality within the active area remains at full pixel-level fidelity. The pixels that are read are read at the same quality. There are simply fewer of them.</p>

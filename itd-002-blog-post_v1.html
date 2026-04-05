@@ -1,0 +1,36 @@
+<h2>How IDT's CrashCam Mini Delivers Instant Replay at 1000 fps for Horse Racing Broadcast</h2>
+
+<p><em>By Ciamac Parhizi</em></p>
+
+<h3>The Problem: Slow-Motion Replay Without an Operator</h3>
+
+<p>Horse racing broadcast demands instant slow-motion replay from multiple camera positions. The traditional approach requires a dedicated operator per camera to trigger recording, manage playback, and route the signal to the OB truck. At a racecourse with 15 camera positions spread across fences, hurdles, and finishing straights, that model does not scale. RaceTech, the UK's primary racing production company, needed a system that could operate autonomously at every position, delivering 1000 fps footage to their existing SDI infrastructure without human intervention between trigger and replay.</p>
+
+<h3>The IDT Solution: Autonomous Trigger-to-Replay Pipeline</h3>
+
+<p>IDT's CrashCam Mini runs a fully autonomous signal chain. A video-based motion trigger detects activity in the camera's field of view. The camera records at 1000 fps in full 1920x1080 resolution, then immediately enters playback mode, looping the captured sequence over 3G-SDI at a clean 50 Hz output. The OB truck's vision mixer receives the signal exactly as it would from any other broadcast source. The entire cycle, from motion detection to on-air replay, happens without an operator touching the system.</p>
+
+<iframe src="/itd/itd-002-sdi-signal-path.html" width="100%" height="600" frameborder="0" style="border:none; border-radius:4px;"></iframe>
+
+<p>The signal path has seven stages: motion detect, trigger, record, playback, SDI output, OB truck ingest, and on-air broadcast. Each stage hands off to the next automatically. The interactive diagram above walks through this chain step by step.</p>
+
+<h3>Firmware Fix: From Dropped Frames to Broadcast-Clean Output</h3>
+
+<p>Early deployments revealed two issues in the SDI output path. The high-speed sensor readout produced a slightly cropped image during certain recording modes, and the SDI timing generator occasionally drifted out of phase with the broadcast reference clock, causing dropped frames downstream. IDT addressed both problems in a firmware update. The fix locked the SDI output to a stable 50 Hz cadence and ensured full-frame 1920x1080 readout regardless of the recording speed. RaceTech confirmed zero dropped frames across a full race day after the update.</p>
+
+<h3>Real-World Deployment: 15 Systems Across UK and Ireland</h3>
+
+<p>RaceTech now operates 15 CrashCam Mini systems across racecourses in the UK and Ireland. Each camera is rated to 200G shock, mounted in exposed positions at fence level and rail height. Ethernet control allows remote configuration across the venue. The cameras feed Sky Sports Racing and RacingTV broadcasts, providing slow-motion coverage of every jump and finish without adding a single operator to the production crew. The CrashCam Mini records at 1920x1080 at 1000 fps, outputs 3G-SDI at 50 Hz, and resets itself for the next event automatically.</p>
+
+<h3>Specifications</h3>
+
+<ul>
+  <li><strong>Camera:</strong> CrashCam Mini (CCM)</li>
+  <li><strong>Resolution:</strong> 1920x1080</li>
+  <li><strong>Frame rate:</strong> 1000 fps</li>
+  <li><strong>Output:</strong> 3G-SDI, 50 Hz</li>
+  <li><strong>Control:</strong> Ethernet</li>
+  <li><strong>Trigger:</strong> Video-based motion detection</li>
+  <li><strong>Shock rating:</strong> 200G</li>
+  <li><strong>Operation:</strong> Autonomous record and playback</li>
+</ul>

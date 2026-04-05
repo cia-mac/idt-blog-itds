@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-005: Camera Placement Geometry</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  /* ── CANVAS ── */
+  .canvas-wrap {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #1a1a1a;
+    background: #0a0a0a;
+  }
+  #floorCanvas {
+    width: 100%;
+    height: 480px;
+    display: block;
+    cursor: default;
+  }
+
+  /* ── CONTROLS ── */
+  .ctrl-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toggle-wrap {
+    display: flex;
+    gap: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #222;
+  }
+  .toggle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 6px 14px;
+    background: #141414;
+    color: #555;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .toggle-btn.active {
+    background: #E8B600;
+    color: #0c0c0c;
+    font-weight: 600;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.68em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s;
+    background: #1e1e1e;
+    color: #888;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-add { background: #E8B600; color: #0c0c0c; }
+
+  .ctrl-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    color: #444;
+    margin-left: auto;
+  }
+
+  /* ── COVERAGE BAR ── */
+  .coverage-row {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .coverage-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    color: #555;
+    min-width: 70px;
+  }
+  .coverage-bar {
+    flex: 1;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .coverage-fill {
+    height: 100%;
+    background: #E8B600;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .coverage-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: #E8B600;
+    min-width: 36px;
+    text-align: right;
+    font-weight: 600;
+  }
+
+  /* ── DETAIL GRID ── */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .detail-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .detail-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .detail-card-label .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .detail-card p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    color: #777;
+    line-height: 1.5;
+  }
+  .detail-card p strong { color: #ccc; font-weight: 500; }
+
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.82em;
+    color: #888;
+  }
+  .note strong { color: #E8B600; }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    color: #555;
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 6px;
+    border-radius: 2px;
+  }
+
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #1a1a1a;
+    color: #333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    text-align: center;
+  }
+
+  @media (max-width: 640px) {
+    .container { padding: 20px 14px 32px; }
+    h1 { font-size: 1.3em; }
+    #floorCanvas { height: 380px; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .ctrl-info { margin-left: 0; width: 100%; margin-top: 4px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Camera Placement Geometry</h1>
+  <p class="subtitle">Crash test layout. Drag cameras to position them. FOV cones update in real time.</p>
+
+  <div class="panel">
+    <div class="panel-label">Top-Down View</div>
+    <div class="canvas-wrap">
+      <canvas id="floorCanvas"></canvas>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#D94040"></div> CrashCam Mini (onboard)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#4080D0"></div> Phoenix GOLD (offboard, 5K)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(232,182,0,0.15)"></div> Impact zone</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.06)"></div> Vehicle</div>
+    </div>
+
+    <div class="ctrl-row">
+      <div class="toggle-wrap">
+        <button class="toggle-btn active" data-type="ccm">+ CCM Onboard</button>
+        <button class="toggle-btn" data-type="phoenix">+ Phoenix Offboard</button>
+      </div>
+      <button class="btn btn-add" id="addBtn">ADD CAMERA</button>
+      <button class="btn" id="resetBtn">RESET</button>
+      <span class="ctrl-info" id="ctrlInfo">Drag any camera to reposition. Scroll on a camera to rotate.</span>
+    </div>
+
+    <div class="coverage-row">
+      <span class="coverage-label">Coverage</span>
+      <div class="coverage-bar"><div class="coverage-fill" id="coverageFill"></div></div>
+      <span class="coverage-pct" id="coveragePct">0%</span>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-card">
+      <div class="detail-card-label"><div class="dot" style="background:#D94040"></div> CrashCam Mini (Onboard)</div>
+      <p><strong>Resolution:</strong> 1920 x 1080<br>
+         <strong>Frame rate:</strong> 5,850 fps<br>
+         <strong>FOV:</strong> Lens-dependent (tight lenses typical)<br>
+         <strong>Weight:</strong> 270g<br>
+         <strong>Mount:</strong> EMFT / C-Mount, on vehicle structure<br>
+         <strong>Purpose:</strong> Deformation detail, airbag deployment, occupant kinematics from inside the crush zone</p>
+    </div>
+    <div class="detail-card">
+      <div class="detail-card-label"><div class="dot" style="background:#4080D0"></div> Phoenix GOLD (Offboard)</div>
+      <p><strong>Resolution:</strong> 5120 x 2448<br>
+         <strong>Frame rate:</strong> 2,000 fps<br>
+         <strong>FOV:</strong> Lens-dependent (wide lenses typical)<br>
+         <strong>Weight:</strong> 1,000g<br>
+         <strong>Mount:</strong> Canon EF, tripod or overhead rig<br>
+         <strong>Purpose:</strong> Full vehicle trajectory, barrier contact geometry, overall deformation envelope</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Design principle:</strong> Onboard cameras capture what offboard cameras cannot see: the view from inside the crumple zone, behind the airbag, under the dashboard. Offboard cameras provide spatial context and measurement coverage across the full vehicle width. A complete crash test setup uses both types in overlapping positions to eliminate blind spots. FOV values shown in this diagram are illustrative. Actual field of view depends on the lens mounted to each camera.
+  </div>
+
+  <footer>ITD-005 / Integrated Design Tools / idtcameras.com</footer>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('floorCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  let W, H;
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = rect.width;
+    H = rect.height;
+  }
+  resize();
+
+  // ── SCENE CONSTANTS ──
+  // Vehicle dimensions (in scene units, roughly 1 unit = 1 cm at display scale)
+  const VEHICLE = { w: 180, h: 80 }; // sedan proportions
+  const BARRIER = { w: 20, h: 100 };
+
+  // Scene center and scale
+  function sceneScale() { return Math.min(W / 600, H / 450); }
+  function sceneCx() { return W / 2; }
+  function sceneCy() { return H / 2; }
+
+  // Convert scene coords to canvas coords
+  function toCanvas(sx, sy) {
+    const s = sceneScale();
+    return { x: sceneCx() + sx * s, y: sceneCy() + sy * s };
+  }
+  function toScene(cx, cy) {
+    const s = sceneScale();
+    return { x: (cx - sceneCx()) / s, y: (cy - sceneCy()) / s };
+  }
+
+  // ── CAMERA TYPES ──
+  const CAM_TYPES = {
+    ccm: {
+      label: 'CCM',
+      fullName: 'CrashCam Mini',
+      color: '#D94040',
+      fovDeg: 52,
+      range: 80,
+      radius: 8,
+      res: '1920x1080',
+      fps: '5,850',
+      fovNote: 'FOV depends on lens'
+    },
+    phoenix: {
+      label: 'PHX',
+      fullName: 'Phoenix GOLD',
+      color: '#4080D0',
+      fovDeg: 80,
+      range: 200,
+      radius: 10,
+      res: '5120x2448',
+      fps: '2,000',
+      fovNote: 'FOV depends on lens'
+    }
+  };
+
+  // ── CAMERAS STATE ──
+  let cameras = [];
+  let nextId = 0;
+  let selectedType = 'ccm';
+  let dragCam = null;
+  let dragOffset = { x: 0, y: 0 };
+  let hoveredCam = null;
+
+  function addCamera(type, sx, sy, angle) {
+    cameras.push({
+      id: nextId++,
+      type: type,
+      sx: sx,
+      sy: sy,
+      angle: angle // radians, 0 = pointing right
+    });
+    draw();
+    updateCoverage();
+  }
+
+  // Default setup
+  function resetScene() {
+    cameras = [];
+    nextId = 0;
+    // 2 onboard CCMs
+    addCamera('ccm', -30, -20, Math.PI);       // front left, facing back
+    addCamera('ccm', -30, 20, Math.PI);        // front right, facing back
+    // 2 offboard Phoenix
+    addCamera('phoenix', -200, -120, 0.3);     // front-left offboard
+    addCamera('phoenix', 0, -150, Math.PI / 2); // overhead-side
+    draw();
+    updateCoverage();
+  }
+
+  // ── TOGGLE BUTTONS ──
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      selectedType = this.dataset.type;
+      document.querySelectorAll('.toggle-btn').forEach(b => b.classList.toggle('active', b === this));
+    });
+  });
+
+  document.getElementById('addBtn').addEventListener('click', function() {
+    // Add at a reasonable default position based on type
+    if (selectedType === 'ccm') {
+      addCamera('ccm', -20 + Math.random() * 40, -10 + Math.random() * 20, Math.PI + (Math.random() - 0.5) * 0.6);
+    } else {
+      const side = Math.random() > 0.5 ? -1 : 1;
+      addCamera('phoenix', -100 + Math.random() * 200, side * (130 + Math.random() * 40), side > 0 ? -Math.PI / 2 : Math.PI / 2);
+    }
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', resetScene);
+
+  // ── DRAWING ──
+
+  function drawGrid() {
+    const s = sceneScale();
+    const step = 40 * s;
+    ctx.strokeStyle = '#141414';
+    ctx.lineWidth = 0.5;
+
+    for (let x = sceneCx() % step; x < W; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = sceneCy() % step; y < H; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+
+  function drawVehicle() {
+    const s = sceneScale();
+    const vw = VEHICLE.w * s;
+    const vh = VEHICLE.h * s;
+    const cx = sceneCx();
+    const cy = sceneCy();
+
+    // Vehicle body
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1.5;
+
+    // Main body (rounded rect)
+    const bx = cx - vw / 2;
+    const by = cy - vh / 2;
+    const r = 8 * s;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by);
+    ctx.lineTo(bx + vw - r * 2, by);
+    ctx.quadraticCurveTo(bx + vw, by, bx + vw, by + r);
+    ctx.lineTo(bx + vw, by + vh - r);
+    ctx.quadraticCurveTo(bx + vw, by + vh, bx + vw - r, by + vh);
+    ctx.lineTo(bx + r, by + vh);
+    ctx.quadraticCurveTo(bx, by + vh, bx, by + vh - r);
+    ctx.lineTo(bx, by + r);
+    ctx.quadraticCurveTo(bx, by, bx + r, by);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Windshield line
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1;
+    const wsX = cx + vw * 0.12;
+    ctx.beginPath();
+    ctx.moveTo(wsX, by + 6);
+    ctx.lineTo(wsX, by + vh - 6);
+    ctx.stroke();
+
+    // Rear window line
+    const rwX = cx - vw * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(rwX, by + 6);
+    ctx.lineTo(rwX, by + vh - 6);
+    ctx.stroke();
+
+    // Center line (axis)
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(bx - 30, cy);
+    ctx.lineTo(bx + vw + 30, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Direction arrow (front = right side)
+    ctx.fillStyle = '#333';
+    ctx.font = '600 9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('FRONT', cx + vw / 2 + 24 * s, cy + 3);
+    ctx.fillText('REAR', cx - vw / 2 - 24 * s, cy + 3);
+
+    // Wheels
+    ctx.fillStyle = '#222';
+    const wh = 14 * s, ww = 6 * s;
+    // Front wheels
+    ctx.fillRect(cx + vw * 0.28 - ww / 2, by - wh * 0.3, ww, wh);
+    ctx.fillRect(cx + vw * 0.28 - ww / 2, by + vh - wh * 0.7, ww, wh);
+    // Rear wheels
+    ctx.fillRect(cx - vw * 0.28 - ww / 2, by - wh * 0.3, ww, wh);
+    ctx.fillRect(cx - vw * 0.28 - ww / 2, by + vh - wh * 0.7, ww, wh);
+  }
+
+  function drawBarrier() {
+    const s = sceneScale();
+    const bw = BARRIER.w * s;
+    const bh = BARRIER.h * s;
+    // Barrier positioned ahead of the vehicle's front
+    const bx = sceneCx() + (VEHICLE.w / 2 + 40) * s;
+    const by = sceneCy() - bh / 2;
+
+    // Impact zone glow
+    ctx.fillStyle = 'rgba(232, 182, 0, 0.06)';
+    ctx.beginPath();
+    ctx.ellipse(bx - 10, sceneCy(), 50 * s, 60 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Barrier block
+    ctx.fillStyle = 'rgba(232, 182, 0, 0.12)';
+    ctx.strokeStyle = '#E8B600';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeRect(bx, by, bw, bh);
+
+    // Hatching
+    ctx.strokeStyle = 'rgba(232, 182, 0, 0.15)';
+    ctx.lineWidth = 0.5;
+    for (let i = -bh; i < bw + bh; i += 8) {
+      ctx.beginPath();
+      ctx.moveTo(bx + Math.max(0, i), by + Math.max(0, -i));
+      ctx.lineTo(bx + Math.min(bw, i + bh), by + Math.min(bh, bh - i));
+      ctx.stroke();
+    }
+
+    ctx.font = '500 7px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(232, 182, 0, 0.4)';
+    ctx.textAlign = 'center';
+    ctx.fillText('BARRIER', bx + bw / 2, by - 6);
+  }
+
+  function drawFOVCone(cam) {
+    const s = sceneScale();
+    const type = CAM_TYPES[cam.type];
+    const pos = toCanvas(cam.sx, cam.sy);
+    const halfFov = (type.fovDeg / 2) * (Math.PI / 180);
+    const range = type.range * s;
+
+    const a1 = cam.angle - halfFov;
+    const a2 = cam.angle + halfFov;
+
+    // Cone fill
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.arc(pos.x, pos.y, range, a1, a2);
+    ctx.closePath();
+
+    const isHovered = hoveredCam === cam;
+    const alpha = isHovered ? 0.14 : 0.07;
+    ctx.fillStyle = type.color + (isHovered ? '24' : '12');
+    ctx.fill();
+
+    // Cone edges
+    ctx.strokeStyle = type.color + (isHovered ? '60' : '30');
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x + Math.cos(a1) * range, pos.y + Math.sin(a1) * range);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.lineTo(pos.x + Math.cos(a2) * range, pos.y + Math.sin(a2) * range);
+    ctx.stroke();
+
+    // Arc
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, range, a1, a2);
+    ctx.strokeStyle = type.color + '20';
+    ctx.stroke();
+  }
+
+  function drawCameraIcon(cam) {
+    const type = CAM_TYPES[cam.type];
+    const pos = toCanvas(cam.sx, cam.sy);
+    const r = type.radius;
+    const isHovered = hoveredCam === cam;
+    const isDragging = dragCam === cam;
+
+    // Outer ring
+    if (isHovered || isDragging) {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r + 6, 0, Math.PI * 2);
+      ctx.fillStyle = type.color + '15';
+      ctx.fill();
+    }
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = isHovered || isDragging ? type.color : type.color + 'cc';
+    ctx.fill();
+    ctx.strokeStyle = '#0c0c0c';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Direction tick
+    const tickLen = r + 5;
+    ctx.beginPath();
+    ctx.moveTo(pos.x + Math.cos(cam.angle) * r, pos.y + Math.sin(cam.angle) * r);
+    ctx.lineTo(pos.x + Math.cos(cam.angle) * tickLen, pos.y + Math.sin(cam.angle) * tickLen);
+    ctx.strokeStyle = type.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Label
+    ctx.font = '600 7px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#0c0c0c';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(type.label, pos.x, pos.y + 0.5);
+
+    // Specs tooltip on hover
+    if (isHovered && !isDragging) {
+      const tx = pos.x + 16;
+      const ty = pos.y - 20;
+      ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+      const tw = 120, th = 42;
+      ctx.beginPath();
+      ctx.roundRect(tx, ty, tw, th, 4);
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      ctx.font = '500 8px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = type.color;
+      ctx.fillText(type.fullName, tx + 6, ty + 5);
+      ctx.fillStyle = '#888';
+      ctx.fillText(type.res + ' @ ' + type.fps + ' fps', tx + 6, ty + 17);
+      ctx.fillStyle = '#555';
+      ctx.fillText(type.fovNote + '  Scroll to rotate', tx + 6, ty + 29);
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    drawGrid();
+    drawBarrier();
+    drawVehicle();
+
+    // Draw FOV cones first (behind icons)
+    cameras.forEach(cam => drawFOVCone(cam));
+    // Then icons on top
+    cameras.forEach(cam => drawCameraIcon(cam));
+
+    // Scale bar
+    const s = sceneScale();
+    const barLen = 100 * s;
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(16, H - 16);
+    ctx.lineTo(16 + barLen, H - 16);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16, H - 20); ctx.lineTo(16, H - 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16 + barLen, H - 20); ctx.lineTo(16 + barLen, H - 12); ctx.stroke();
+    ctx.font = '8px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#444';
+    ctx.textAlign = 'center';
+    ctx.fillText('1 m', 16 + barLen / 2, H - 22);
+  }
+
+  // ── COVERAGE CALCULATION ──
+  // Sample points across the impact zone and vehicle area, check how many fall inside at least one FOV cone
+
+  function updateCoverage() {
+    const s = sceneScale();
+    const sampleRes = 6; // scene units between samples
+    let total = 0;
+    let covered = 0;
+
+    // Sample the vehicle area + impact zone
+    const xMin = -VEHICLE.w / 2 - 10;
+    const xMax = VEHICLE.w / 2 + 60; // extends to barrier
+    const yMin = -VEHICLE.h / 2 - 20;
+    const yMax = VEHICLE.h / 2 + 20;
+
+    for (let sx = xMin; sx <= xMax; sx += sampleRes) {
+      for (let sy = yMin; sy <= yMax; sy += sampleRes) {
+        total++;
+        for (let c = 0; c < cameras.length; c++) {
+          const cam = cameras[c];
+          const type = CAM_TYPES[cam.type];
+          const dx = sx - cam.sx;
+          const dy = sy - cam.sy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > type.range) continue;
+
+          const angleToPoint = Math.atan2(dy, dx);
+          let diff = angleToPoint - cam.angle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+
+          const halfFov = (type.fovDeg / 2) * (Math.PI / 180);
+          if (Math.abs(diff) <= halfFov) {
+            covered++;
+            break;
+          }
+        }
+      }
+    }
+
+    const pct = total > 0 ? Math.round(covered / total * 100) : 0;
+    document.getElementById('coverageFill').style.width = pct + '%';
+    document.getElementById('coveragePct').textContent = pct + '%';
+  }
+
+  // ── INTERACTION ──
+
+  function findCameraAt(cx, cy) {
+    const scene = toScene(cx, cy);
+    for (let i = cameras.length - 1; i >= 0; i--) {
+      const cam = cameras[i];
+      const dx = scene.x - cam.sx;
+      const dy = scene.y - cam.sy;
+      const r = CAM_TYPES[cam.type].radius / sceneScale() + 4;
+      if (dx * dx + dy * dy < r * r * 4) return cam;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('mousedown', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const cam = findCameraAt(cx, cy);
+    if (cam) {
+      dragCam = cam;
+      const scene = toScene(cx, cy);
+      dragOffset.x = cam.sx - scene.x;
+      dragOffset.y = cam.sy - scene.y;
+      canvas.style.cursor = 'grabbing';
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+
+    if (dragCam) {
+      const scene = toScene(cx, cy);
+      dragCam.sx = scene.x + dragOffset.x;
+      dragCam.sy = scene.y + dragOffset.y;
+      draw();
+      updateCoverage();
+      return;
+    }
+
+    const cam = findCameraAt(cx, cy);
+    if (cam !== hoveredCam) {
+      hoveredCam = cam;
+      canvas.style.cursor = cam ? 'grab' : 'default';
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mouseup', function() {
+    if (dragCam) {
+      dragCam = null;
+      canvas.style.cursor = hoveredCam ? 'grab' : 'default';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', function() {
+    dragCam = null;
+    hoveredCam = null;
+    canvas.style.cursor = 'default';
+    draw();
+  });
+
+  // Scroll to rotate
+  canvas.addEventListener('wheel', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const cam = findCameraAt(cx, cy);
+    if (cam) {
+      e.preventDefault();
+      cam.angle += e.deltaY > 0 ? 0.08 : -0.08;
+      draw();
+      updateCoverage();
+    }
+  }, { passive: false });
+
+  // Touch support
+  let touchCam = null;
+  let lastTouch = null;
+
+  canvas.addEventListener('touchstart', function(e) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const cx = touch.clientX - rect.left;
+    const cy = touch.clientY - rect.top;
+    const cam = findCameraAt(cx, cy);
+    if (cam) {
+      e.preventDefault();
+      touchCam = cam;
+      const scene = toScene(cx, cy);
+      dragOffset.x = cam.sx - scene.x;
+      dragOffset.y = cam.sy - scene.y;
+      lastTouch = { x: cx, y: cy };
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', function(e) {
+    if (!touchCam) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const cx = touch.clientX - rect.left;
+    const cy = touch.clientY - rect.top;
+    const scene = toScene(cx, cy);
+    touchCam.sx = scene.x + dragOffset.x;
+    touchCam.sy = scene.y + dragOffset.y;
+    lastTouch = { x: cx, y: cy };
+    draw();
+    updateCoverage();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function() {
+    touchCam = null;
+    lastTouch = null;
+  });
+
+  // ── RESIZE ──
+  window.addEventListener('resize', function() {
+    resize();
+    draw();
+  });
+
+  // ── INIT ──
+  resetScene();
+
+})();
+</script>
+</body>
+</html>

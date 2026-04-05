@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Technical Diagrams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 96px 40px 0;
+    position: relative;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 500px;
+    background: radial-gradient(ellipse at center, rgba(232,182,0,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: #E8B600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hero-count::before {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 1px;
+    background: #E8B600;
+  }
+  .hero h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(2.8em, 6vw, 4.2em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 24px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: #E8B600;
+  }
+  .hero-sub {
+    font-size: 1.2em;
+    color: #555;
+    max-width: 640px;
+    line-height: 1.7;
+    margin-bottom: 64px;
+  }
+
+  /* ── DIVIDER ── */
+  .section-divider {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .section-divider span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #333;
+    white-space: nowrap;
+  }
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, #1e1e1e, transparent);
+  }
+
+  /* ── FEATURED (first card, full width) ── */
+  .featured {
+    max-width: 1400px;
+    margin: 0 auto 48px;
+    padding: 0 40px;
+  }
+  .featured-card {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 16px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+  }
+  .featured-card:hover {
+    border-color: #E8B600;
+    box-shadow: 0 12px 60px rgba(232,182,0,0.06);
+  }
+  .featured-preview {
+    position: relative;
+    min-height: 440px;
+    background: #0a0a0a;
+    overflow: hidden;
+  }
+  .featured-preview iframe {
+    width: 200%;
+    height: 200%;
+    transform: scale(0.5);
+    transform-origin: top left;
+    border: none;
+    pointer-events: none;
+  }
+  .featured-preview .card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(12,12,12,0.4));
+    z-index: 2;
+  }
+  .featured-body {
+    padding: 48px 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .featured-body .card-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #E8B600;
+    margin-bottom: 14px;
+  }
+  .featured-body .card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 2em;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 16px;
+    letter-spacing: -0.5px;
+  }
+  .featured-body .card-desc {
+    font-size: 1.05em;
+    color: #666;
+    line-height: 1.75;
+    margin-bottom: 28px;
+  }
+  .featured-body .card-tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .featured-cta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    color: #E8B600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    letter-spacing: 0.5px;
+  }
+  .featured-cta::after {
+    content: '\2192';
+    transition: transform 0.2s;
+    font-size: 1.1em;
+  }
+  .featured-card:hover .featured-cta::after {
+    transform: translateX(6px);
+  }
+
+  /* ── GRID ── */
+  .gallery {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 40px 80px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.25s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    position: relative;
+  }
+  .card:hover {
+    border-color: #E8B600;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 40px rgba(232,182,0,0.05);
+  }
+
+  .card-preview {
+    width: 100%;
+    height: 300px;
+    background: #0a0a0a;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-preview iframe {
+    width: 200%;
+    height: 200%;
+    transform: scale(0.5);
+    transform-origin: top left;
+    border: none;
+    pointer-events: none;
+  }
+  .card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(12,12,12,0.3));
+    z-index: 2;
+    transition: background 0.3s;
+  }
+  .card:hover .card-overlay {
+    background: linear-gradient(to bottom, transparent 50%, rgba(12,12,12,0.1));
+  }
+
+  /* Number badge */
+  .card-badge {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 3;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #E8B600;
+    background: rgba(12,12,12,0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(232,182,0,0.15);
+  }
+
+  .card-body {
+    padding: 24px 28px 28px;
+  }
+  .card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+  }
+  .card:hover .card-title { color: #fff; }
+  .card-desc {
+    font-size: 0.95em;
+    color: #555;
+    line-height: 1.65;
+  }
+  .card:hover .card-desc { color: #666; }
+  .card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: #161616;
+    color: #444;
+    letter-spacing: 0.3px;
+    border: 1px solid #1e1e1e;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .card:hover .tag {
+    color: #666;
+    border-color: #2a2a2a;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 40px 72px;
+    border-top: 1px solid #151515;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .footer-left {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #2a2a2a;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .footer-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .footer-stat-val {
+    color: #444;
+    font-weight: 600;
+    font-size: 1.1em;
+  }
+  .footer-stat-label {
+    font-size: 0.82em;
+    color: #2a2a2a;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .footer-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #2a2a2a;
+  }
+  .footer-right {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #2a2a2a;
+  }
+  .footer-right a {
+    color: #555;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-right a:hover { color: #E8B600; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1000px) {
+    .hero { padding: 64px 28px 0; }
+    .hero h1 { font-size: 2.6em; }
+    .featured { padding: 0 28px; }
+    .featured-card { grid-template-columns: 1fr; }
+    .featured-preview { min-height: 300px; }
+    .featured-body { padding: 32px 28px; }
+    .featured-body .card-title { font-size: 1.6em; }
+    .gallery { grid-template-columns: 1fr; padding: 0 28px 64px; }
+    .card-preview { height: 280px; }
+    .section-divider { padding: 0 28px; }
+    .footer { padding: 32px 28px 56px; }
+  }
+  @media (max-width: 600px) {
+    .hero { padding: 48px 20px 0; }
+    .hero h1 { font-size: 2em; }
+    .hero-sub { font-size: 1em; }
+    .featured { padding: 0 20px; }
+    .featured-body { padding: 24px 20px; }
+    .featured-body .card-title { font-size: 1.3em; }
+    .gallery { padding: 0 20px 48px; }
+    .card-preview { height: 220px; }
+    .card-body { padding: 20px; }
+    .section-divider { padding: 0 20px; }
+    .footer { padding: 24px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-count">6 Interactive Diagrams</div>
+  <h1>How High-Speed<br>Cameras <em>Actually</em> Work</h1>
+  <p class="hero-sub">Visual explanations of the engineering behind high-speed imaging. Each diagram is self-contained, interactive, and built with zero dependencies.</p>
+</div>
+
+<!-- ── FEATURED ── -->
+<div class="section-divider"><span>Latest</span></div>
+
+<div class="featured">
+  <a class="featured-card" href="itd-007-sensor-readout_v1.html">
+    <div class="featured-preview">
+      <iframe src="itd-007-sensor-readout_v1.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="featured-body">
+      <div class="card-number">ITD-007</div>
+      <div class="card-title">Sensor Readout Modes</div>
+      <div class="card-desc">Animated pixel grid showing rolling vs. global shutter and FSI vs. BSI illumination. The timing diagram below reveals why rolling shutter produces skewed images of fast-moving subjects.</div>
+      <div class="card-tags">
+        <span class="tag">Global Shutter</span>
+        <span class="tag">BSI</span>
+        <span class="tag">Sensor Architecture</span>
+      </div>
+      <div class="featured-cta">Explore diagram</div>
+    </div>
+  </a>
+</div>
+
+<!-- ── GRID ── -->
+<div class="section-divider"><span>Full Series</span></div>
+
+<div class="gallery">
+
+  <a class="card" href="itd-002-sdi-signal-path_v1.html">
+    <div class="card-preview">
+      <span class="card-badge">002</span>
+      <iframe src="itd-002-sdi-signal-path_v1.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">SDI Signal Path</div>
+      <div class="card-desc">The 7-stage journey from motion detection to broadcast output. Before/after firmware comparison.</div>
+      <div class="card-tags">
+        <span class="tag">Broadcast</span>
+        <span class="tag">3G-SDI</span>
+        <span class="tag">CrashCam Mini</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="itd-003-state-machine_v1.html">
+    <div class="card-preview">
+      <span class="card-badge">003</span>
+      <iframe src="itd-003-state-machine_v1.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Camera State Machine</div>
+      <div class="card-desc">Six operational states from idle to reset. The autonomous capture lifecycle, animated.</div>
+      <div class="card-tags">
+        <span class="tag">Automation</span>
+        <span class="tag">Trigger Logic</span>
+        <span class="tag">Crash Test</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="itd-004-fps-resolution_v2.html">
+    <div class="card-preview">
+      <span class="card-badge">004</span>
+      <iframe src="itd-004-fps-resolution_v2.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">FPS vs. Resolution</div>
+      <div class="card-desc">13 camera families, 47 modes. See how sensor cropping enables higher frame rates.</div>
+      <div class="card-tags">
+        <span class="tag">Sensor Crop</span>
+        <span class="tag">Frame Rate</span>
+        <span class="tag">47 Modes</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="itd-005-camera-placement_v1.html">
+    <div class="card-preview">
+      <span class="card-badge">005</span>
+      <iframe src="itd-005-camera-placement_v1.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Camera Placement</div>
+      <div class="card-desc">Top-down crash test layout. Drag cameras, rotate FOV cones, measure coverage in real time.</div>
+      <div class="card-tags">
+        <span class="tag">Crash Test</span>
+        <span class="tag">FOV</span>
+        <span class="tag">Draggable</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="itd-006-stereo-piv_v1.html">
+    <div class="card-preview">
+      <span class="card-badge">006</span>
+      <iframe src="itd-006-stereo-piv_v1.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Stereo PIV Setup</div>
+      <div class="card-desc">Flow channel with draggable cameras. Stereo vs. volumetric modes. Baseline and convergence controls.</div>
+      <div class="card-tags">
+        <span class="tag">PIV</span>
+        <span class="tag">Stereo</span>
+        <span class="tag">Triangulation</span>
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<!-- ── FOOTER ── -->
+<div class="footer">
+  <div class="footer-left">
+    <div class="footer-stat">
+      <span class="footer-stat-val">6</span>
+      <span class="footer-stat-label">Diagrams</span>
+    </div>
+    <div class="footer-dot"></div>
+    <div class="footer-stat">
+      <span class="footer-stat-val">0</span>
+      <span class="footer-stat-label">Dependencies</span>
+    </div>
+    <div class="footer-dot"></div>
+    <div class="footer-stat">
+      <span class="footer-stat-val">HTML</span>
+      <span class="footer-stat-label">Self-contained</span>
+    </div>
+  </div>
+  <div class="footer-right">Built by <a href="https://ciamac.com">Ciamac Parhizi</a></div>
+</div>
+
+</body>
+</html>

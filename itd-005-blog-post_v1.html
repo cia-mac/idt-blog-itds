@@ -1,0 +1,23 @@
+<h2>Camera Placement Geometry in Crash Testing: Onboard vs Offboard Coverage</h2>
+
+<p><em>By Ciamac Parhizi</em></p>
+
+<h3>The Problem: Blind Spots Kill Data</h3>
+
+<p>A crash test lasts less than 200 milliseconds. Every angle that is not covered is data that does not exist. There is no second take. The test vehicle is destroyed, the barrier is deformed, and the dummy instrumentation captures a single event. If a camera is pointed two degrees too far left, the B-pillar deformation that mattered most is outside the frame. If the field of view is too narrow, the airbag deployment obscures the occupant kinematics behind it. Camera placement in crash testing is a geometry problem with zero margin for error.</p>
+
+<h3>The IDT Approach: Two Camera Types, Overlapping Coverage</h3>
+
+<p>IDT addresses crash test coverage with two complementary camera systems. Onboard cameras, the CrashCam Mini (CCM), mount directly on the vehicle structure at 270g with EMFT or C-Mount. They capture at 1920 x 1080 at 5,850 fps, positioned inches from the deformation zone. Offboard cameras, the Phoenix GOLD, sit on tripods or overhead rigs at safe distances. They shoot at 5120 x 2448 at 2,000 fps via Canon EF mount, capturing the full vehicle trajectory and barrier contact geometry. Field of view in both cases is determined by the lens, not the camera body. Onboard positions typically use shorter focal lengths for tight angles. Offboard rigs use wider lenses to cover the full vehicle width.</p>
+
+<iframe src="/itd/itd-005-camera-placement.html" width="100%" height="600" frameborder="0" style="border:none; border-radius:4px;"></iframe>
+
+<p>The interactive diagram above shows a top-down crash test layout. Drag any camera to reposition it and watch the field-of-view cones update in real time. Scroll over a camera to rotate its viewing angle. Add onboard or offboard cameras to build coverage. The percentage bar tracks how much of the vehicle and impact zone falls within at least one camera's field of view.</p>
+
+<h3>Why Both Types Matter</h3>
+
+<p>Onboard cameras see what offboard cameras cannot. A CCM mounted on the steering column captures airbag inflation timing from the occupant's perspective. A CCM on the door sill records the intrusion profile as the door panel deforms inward. These are views that no external camera angle can replicate because the vehicle structure itself blocks the line of sight. Offboard cameras provide the spatial reference: full-vehicle displacement, yaw rotation after impact, and barrier face deformation across its full width. Neither type alone produces a complete dataset. The overlap between their coverage zones is where measurement confidence is highest.</p>
+
+<h3>Real-World Layout Principles</h3>
+
+<p>A typical frontal offset crash test at a Euro NCAP or IIHS facility uses four to six onboard CCMs (dashboard, A-pillar, footwell, door panel, overhead, rear occupant) and three to four offboard Phoenix cameras (front oblique left, front oblique right, overhead, and lateral). The onboard units are mounted directly to the vehicle structure. The offboard units connect via fiber to a processor rack in the control room. IDT's Ethernet control allows all cameras to be configured, armed, and triggered from a single workstation, ensuring synchronous capture across every position in the layout.</p>
