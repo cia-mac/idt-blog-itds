@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-009: Exposure Time vs. Motion Blur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .subtitle span {
+    color: #E8B600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  #blurCanvas {
+    width: 100%;
+    height: 400px;
+    display: block;
+    border-radius: 8px;
+  }
+
+  /* ── EXPOSURE SLIDER ── */
+  .exp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .exp-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #444;
+  }
+  .exp-slider-wrap {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .exp-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .exp-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 3px solid #0c0c0c;
+    box-shadow: 0 0 8px rgba(232,182,0,0.3);
+  }
+  .exp-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #E8B600;
+    min-width: 120px;
+    text-align: right;
+    letter-spacing: -0.5px;
+  }
+  .exp-unit {
+    font-size: 0.55em;
+    font-weight: 400;
+    color: #666;
+  }
+
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid #1e1e1e;
+    background: #141414;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .preset:hover { border-color: #333; color: #888; }
+  .preset.active { border-color: #E8B600; color: #E8B600; background: rgba(232,182,0,0.06); }
+
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: #ccc;
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: #E8B600; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s, background 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #E8B600; color: #0c0c0c; }
+  .btn-secondary { background: #1e1e1e; color: #888; }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #555;
+  }
+  .speed-ctrl input[type="range"] {
+    width: 80px;
+    -webkit-appearance: none;
+    height: 3px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #E8B600;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .note p {
+    font-size: 0.82em;
+    color: #888;
+    line-height: 1.65;
+  }
+  .note strong { color: #bbb; }
+
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 14px 0;
+    border-top: 1px solid #1a1a1a;
+    margin-top: 20px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 2px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #E8B600;
+  }
+
+  /* ── FIREFOX SLIDER STYLING ── */
+  input[type="range"]::-moz-range-track { background: #333; height: 4px; border: none; border-radius: 2px; }
+  input[type="range"]::-moz-range-thumb { background: #E8B600; border: none; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #blurCanvas { height: 320px; }
+    .exp-value { font-size: 1em; min-width: 90px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Exposure Time vs. Motion Blur</h1>
+  <div class="subtitle">A longer shutter collects more light and more motion. <span>ITD-009</span></div>
+
+  <div class="panel">
+    <div class="panel-label">Captured Frame</div>
+    <canvas id="blurCanvas"></canvas>
+    <div class="controls">
+      <button class="btn btn-primary" id="btnPlay">Play</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+      <div class="speed-ctrl">
+        <label>Object Speed</label>
+        <input type="range" id="speedSlider" min="0.3" max="2.5" step="0.1" value="1">
+        <span class="speed-val" id="speedVal">1.0x</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Exposure Time</div>
+    <div class="exp-row">
+      <span class="exp-label">Shutter</span>
+      <div class="exp-slider-wrap">
+        <input type="range" class="exp-slider" id="expSlider" min="0" max="7" step="1" value="3">
+      </div>
+      <div class="exp-value" id="expValue">1/500 <span class="exp-unit">sec</span></div>
+    </div>
+    <div class="preset-row" id="presetRow">
+      <button class="preset" data-idx="0">1/30</button>
+      <button class="preset" data-idx="1">1/60</button>
+      <button class="preset" data-idx="2">1/250</button>
+      <button class="preset active" data-idx="3">1/500</button>
+      <button class="preset" data-idx="4">1/1000</button>
+      <button class="preset" data-idx="5">1/5000</button>
+      <button class="preset" data-idx="6">1/10000</button>
+      <button class="preset" data-idx="7">1/50000</button>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Exposure</div>
+        <div class="readout-card-value gold" id="cardExposure">2 ms</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Blur Distance</div>
+        <div class="readout-card-value" id="cardBlur">20 mm</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Light Collected</div>
+        <div class="readout-card-value" id="cardLight">Medium</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Sharpness</div>
+        <div class="readout-card-value" id="cardSharp">Moderate</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p>Exposure time controls how long the sensor collects photons for a single frame. A <strong>1/30s</strong> exposure at 10 m/s produces 333 mm of motion blur. The subject smears across the frame. A <strong>1/50,000s</strong> exposure (20 microseconds) freezes the same subject with only 0.2 mm of displacement, but collects 1,667 times less light. High-speed cameras compensate with larger pixels, higher ISO sensitivity, and brighter illumination. The exposure decision is always a tradeoff: short enough to freeze the motion, long enough to maintain signal quality.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-009</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Shutter / Blur</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Slider + Animate</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Source</span>
+      <span class="spec-value">idtcameras.com</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── EXPOSURE STEPS ──
+  const EXP_STEPS = [
+    { label: '1/30',    val: 1/30 },
+    { label: '1/60',    val: 1/60 },
+    { label: '1/250',   val: 1/250 },
+    { label: '1/500',   val: 1/500 },
+    { label: '1/1000',  val: 1/1000 },
+    { label: '1/5000',  val: 1/5000 },
+    { label: '1/10000', val: 1/10000 },
+    { label: '1/50000', val: 1/50000 },
+  ];
+
+  // ── STATE ──
+  let currentExpIdx = 3;
+  let playing = false;
+  let objSpeed = 1;
+  let animId = null;
+  let lastTime = 0;
+  let time = 0;
+  let dpr = 1;
+
+  // Spinning disc
+  let discAngle = 0;
+  const DISC_RPM = 3000; // base RPM
+  const DISC_RADIUS = 100;
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('blurCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── DRAW ──
+  function draw() {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0, 0, w, h);
+
+    const exp = EXP_STEPS[currentExpIdx].val;
+    const rpm = DISC_RPM * objSpeed;
+    const rps = rpm / 60; // revolutions per second
+    const angularBlur = rps * exp * Math.PI * 2; // radians of blur
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(w, h) * 0.3;
+
+    // ── BACKGROUND: exposure meter ──
+    // Light level indicator (top)
+    const lightLevel = Math.min(1, exp * 500); // normalized
+    const lightBarW = w - 80;
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.textAlign = 'left';
+    ctx.fillText('Light collected', 40, 20);
+
+    ctx.fillStyle = '#161616';
+    ctx.fillRect(40, 26, lightBarW, 6);
+    const barColor = lightLevel > 0.7 ? '#40B060' : lightLevel > 0.2 ? '#E8B600' : '#D94040';
+    ctx.fillStyle = barColor;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(40, 26, lightBarW * Math.min(lightLevel, 1), 6);
+    ctx.globalAlpha = 1;
+
+    // ── DISC ──
+    // Draw the spinning disc with motion blur effect
+    const spokes = 6;
+    const spokeWidth = 0.08; // radians
+
+    // Number of blur samples (more = smoother blur)
+    const blurSamples = Math.min(Math.max(Math.ceil(angularBlur / 0.01), 1), 200);
+    const sampleAlpha = Math.min(1, 1 / blurSamples * 1.5);
+
+    // Disc base circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#141414';
+    ctx.fill();
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Draw spokes with blur
+    for (let s = 0; s < blurSamples; s++) {
+      const sampleAngle = discAngle - (s / blurSamples) * angularBlur;
+
+      ctx.globalAlpha = sampleAlpha;
+
+      for (let i = 0; i < spokes; i++) {
+        const baseAngle = sampleAngle + (i / spokes) * Math.PI * 2;
+
+        // Spoke
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, baseAngle - spokeWidth, baseAngle + spokeWidth);
+        ctx.closePath();
+        ctx.fillStyle = '#E8B600';
+        ctx.fill();
+      }
+
+      // Center hub
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.15, 0, Math.PI * 2);
+      ctx.fillStyle = '#E8B600';
+      ctx.fill();
+
+      // Marker dot on rim
+      const markerAngle = sampleAngle;
+      const mx = cx + Math.cos(markerAngle) * r * 0.75;
+      const my = cy + Math.sin(markerAngle) * r * 0.75;
+      ctx.beginPath();
+      ctx.arc(mx, my, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+
+    // ── SHUTTER GATE VISUALIZATION ──
+    // Bottom section: shows the shutter open/close
+    const gateY = h - 70;
+    const gateW = w - 80;
+    const gateH = 20;
+
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.textAlign = 'left';
+    ctx.fillText('Shutter gate', 40, gateY - 8);
+
+    // Frame period bar
+    ctx.fillStyle = '#111';
+    ctx.fillRect(40, gateY, gateW, gateH);
+    ctx.strokeStyle = '#1e1e1e';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(40, gateY, gateW, gateH);
+
+    // Exposure portion (gold)
+    const framePeriod = 1 / 1000; // assume 1000fps base
+    const expFrac = Math.min(exp / framePeriod, 1);
+    const expW = expFrac * gateW;
+
+    ctx.fillStyle = '#E8B600';
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(40, gateY, expW, gateH);
+    ctx.globalAlpha = 1;
+
+    // Open/close labels
+    ctx.font = `500 8px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#E8B600';
+    ctx.textAlign = 'left';
+    ctx.fillText('OPEN', 42, gateY + gateH / 2 + 3);
+
+    if (expFrac < 0.9) {
+      ctx.fillStyle = '#333';
+      ctx.textAlign = 'right';
+      ctx.fillText('CLOSED', 40 + gateW - 4, gateY + gateH / 2 + 3);
+    }
+
+    // Exposure time label
+    ctx.font = `500 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    const expMs = exp * 1000;
+    const expLabel = expMs >= 1 ? `${expMs.toFixed(1)} ms` : `${(exp * 1000000).toFixed(0)} \u00B5s`;
+    ctx.fillText(expLabel, 40 + expW / 2, gateY + gateH + 14);
+
+    // ── ANGULAR BLUR READOUT ──
+    ctx.font = `500 10px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#444';
+    const blurDeg = (angularBlur * 180 / Math.PI);
+    ctx.fillText(`Angular blur: ${blurDeg.toFixed(1)}\u00B0`, w - 40, gateY - 8);
+
+    // RPM label
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${rpm.toLocaleString()} RPM`, cx, cy + r + 30);
+
+    updateCards();
+  }
+
+  function updateCards() {
+    const exp = EXP_STEPS[currentExpIdx].val;
+    const rpm = DISC_RPM * objSpeed;
+    const linearSpeed = 10; // m/s reference
+    const blurDist = linearSpeed * exp * 1000; // mm
+
+    const expMs = exp * 1000;
+    let expLabel;
+    if (expMs >= 1) expLabel = `${expMs.toFixed(1)} ms`;
+    else expLabel = `${(exp * 1000000).toFixed(0)} \u00B5s`;
+    document.getElementById('cardExposure').textContent = expLabel;
+
+    document.getElementById('cardBlur').textContent = blurDist >= 1 ? `${blurDist.toFixed(1)} mm` : `${(blurDist * 1000).toFixed(0)} \u00B5m`;
+
+    let lightLabel;
+    if (exp >= 1/60) { lightLabel = 'High'; }
+    else if (exp >= 1/500) { lightLabel = 'Medium'; }
+    else if (exp >= 1/5000) { lightLabel = 'Low'; }
+    else { lightLabel = 'Very low'; }
+    document.getElementById('cardLight').textContent = lightLabel;
+
+    const blurDeg = (rpm / 60) * exp * 360;
+    let sharpLabel;
+    if (blurDeg < 0.5) sharpLabel = 'Frozen';
+    else if (blurDeg < 5) sharpLabel = 'Sharp';
+    else if (blurDeg < 30) sharpLabel = 'Moderate';
+    else if (blurDeg < 90) sharpLabel = 'Soft';
+    else sharpLabel = 'Streaked';
+    document.getElementById('cardSharp').textContent = sharpLabel;
+  }
+
+  // ── ANIMATION ──
+  function animate(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+
+    if (playing) {
+      const rpm = DISC_RPM * objSpeed;
+      discAngle += (rpm / 60) * Math.PI * 2 * dt;
+    }
+
+    time += dt;
+    draw();
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastTime = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    playing = false;
+    discAngle = 0;
+    document.getElementById('btnPlay').textContent = 'Play';
+  });
+
+  document.getElementById('speedSlider').addEventListener('input', (e) => {
+    objSpeed = parseFloat(e.target.value);
+    document.getElementById('speedVal').textContent = objSpeed.toFixed(1) + 'x';
+  });
+
+  const expSlider = document.getElementById('expSlider');
+  expSlider.addEventListener('input', () => {
+    setExp(parseInt(expSlider.value));
+  });
+
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      setExp(idx);
+      expSlider.value = idx;
+    });
+  });
+
+  function setExp(idx) {
+    currentExpIdx = idx;
+    document.getElementById('expValue').innerHTML = `${EXP_STEPS[idx].label} <span class="exp-unit">sec</span>`;
+
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+    const activePreset = document.querySelector(`.preset[data-idx="${idx}"]`);
+    if (activePreset) activePreset.classList.add('active');
+
+    updateCards();
+  }
+
+  // ── INIT ──
+  resize();
+  updateCards();
+  draw();
+  window.addEventListener('resize', () => { resize(); draw(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-014: High Dynamic Range</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container {
+    width: 100%;
+    max-width: 900px;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .header {
+    padding: 28px 32px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .header-left h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #E8B600;
+    margin-bottom: 6px;
+  }
+  .header-left h2 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+  .mode-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .mode-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 8px 16px;
+    background: transparent;
+    color: #555;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .mode-btn.active {
+    background: #E8B600;
+    color: #0c0c0c;
+    font-weight: 600;
+  }
+  .mode-btn:hover:not(.active) {
+    color: #999;
+    background: #1a1a1a;
+  }
+
+  /* Scene area */
+  .scene-area {
+    padding: 24px 32px;
+  }
+  .scene-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .scene-panel {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #1e1e1e;
+  }
+  .scene-panel canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .scene-label {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #999;
+    background: rgba(12,12,12,0.8);
+    padding: 4px 10px;
+    border-radius: 5px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .scene-label.hdr-label {
+    color: #E8B600;
+  }
+  .clip-indicator {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    padding: 4px 10px;
+    border-radius: 5px;
+    background: rgba(12,12,12,0.8);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .clip-highlight { color: #D94040; }
+  .clip-shadow { color: #4080D0; }
+  .clip-none { color: #40B060; }
+
+  /* Histogram */
+  .histogram-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .histogram-panel {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #1e1e1e;
+    background: #0a0a0a;
+  }
+  .histogram-panel canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Controls */
+  .controls {
+    padding: 0 32px 24px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .control-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 100px;
+  }
+  .slider-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  input[type="range"]::-moz-range-track {
+    background: #333;
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: #E8B600;
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #E8B600;
+    min-width: 60px;
+    text-align: right;
+  }
+
+  /* Presets */
+  .preset-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    padding: 0 32px;
+  }
+  .preset-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: #161616;
+    color: #555;
+    border: 1px solid #1e1e1e;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .preset-btn:hover {
+    color: #999;
+    border-color: #333;
+  }
+  .preset-btn.active {
+    color: #E8B600;
+    border-color: #E8B600;
+    background: rgba(232,182,0,0.08);
+  }
+
+  /* Stats strip */
+  .stats-strip {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 32px;
+    border-top: 1px solid #1e1e1e;
+    background: #0a0a0a;
+  }
+  .stat-item {
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #E8B600;
+    margin-bottom: 4px;
+  }
+  .stat-val.red { color: #D94040; }
+  .stat-val.green { color: #40B060; }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Exposure bracket strip */
+  .bracket-strip {
+    padding: 0 32px 20px;
+  }
+  .bracket-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .bracket-bar {
+    display: flex;
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #1e1e1e;
+    position: relative;
+  }
+  .bracket-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    letter-spacing: 0.5px;
+    transition: all 0.4s;
+  }
+  .bracket-shadow { background: #1a2a40; color: #4080D0; }
+  .bracket-mid { background: #1a1a10; color: #888; }
+  .bracket-highlight { background: #3a2010; color: #E8B600; }
+  .bracket-clipped {
+    position: absolute;
+    height: 100%;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(217,64,64,0.15),
+      rgba(217,64,64,0.15) 4px,
+      transparent 4px,
+      transparent 8px
+    );
+    transition: all 0.4s;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>ITD-014</h1>
+      <h2>High Dynamic Range</h2>
+    </div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="standard">Standard</button>
+      <button class="mode-btn" data-mode="hdr">HDR</button>
+    </div>
+  </div>
+
+  <div class="preset-row">
+    <button class="preset-btn" data-bits="8">8-bit SDR</button>
+    <button class="preset-btn active" data-bits="10">10-bit</button>
+    <button class="preset-btn" data-bits="12">12-bit</button>
+    <button class="preset-btn" data-bits="14">14-bit HDR</button>
+  </div>
+
+  <div class="scene-area">
+    <div class="scene-row">
+      <div class="scene-panel">
+        <canvas id="sceneStd" width="420" height="280"></canvas>
+        <span class="scene-label">Standard Exposure</span>
+        <span class="clip-indicator clip-highlight" id="clipStd"></span>
+      </div>
+      <div class="scene-panel">
+        <canvas id="sceneHDR" width="420" height="280"></canvas>
+        <span class="scene-label hdr-label">HDR Result</span>
+        <span class="clip-indicator clip-none" id="clipHDR"></span>
+      </div>
+    </div>
+    <div class="histogram-row">
+      <div class="histogram-panel">
+        <canvas id="histStd" width="420" height="120"></canvas>
+      </div>
+      <div class="histogram-panel">
+        <canvas id="histHDR" width="420" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="bracket-strip">
+    <div class="bracket-label">Captured Dynamic Range</div>
+    <div class="bracket-bar" id="bracketBar">
+      <div class="bracket-segment bracket-shadow" id="bShadow">Shadows</div>
+      <div class="bracket-segment bracket-mid" id="bMid">Midtones</div>
+      <div class="bracket-segment bracket-highlight" id="bHighlight">Highlights</div>
+      <div class="bracket-clipped" id="bClipped"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="control-row">
+      <span class="control-label">Exposure</span>
+      <div class="slider-wrap">
+        <input type="range" id="exposureSlider" min="-4" max="4" step="0.1" value="0">
+        <span class="slider-val" id="exposureVal">0 EV</span>
+      </div>
+    </div>
+    <div class="control-row">
+      <span class="control-label">Scene DR</span>
+      <div class="slider-wrap">
+        <input type="range" id="sceneDRSlider" min="6" max="20" step="1" value="14">
+        <span class="slider-val" id="sceneDRVal">14 stops</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat-item">
+      <div class="stat-val" id="statSensorDR">10</div>
+      <div class="stat-label">Sensor DR (stops)</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statSceneDR">14</div>
+      <div class="stat-label">Scene DR (stops)</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val red" id="statClipped">28%</div>
+      <div class="stat-label">Clipped (Std)</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val green" id="statRecovered">28%</div>
+      <div class="stat-label">Recovered (HDR)</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statTones">1,024</div>
+      <div class="stat-label">Tonal Levels</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const DPR = window.devicePixelRatio || 1;
+
+  // Canvas refs
+  const cStd = document.getElementById('sceneStd');
+  const cHDR = document.getElementById('sceneHDR');
+  const cHistStd = document.getElementById('histStd');
+  const cHistHDR = document.getElementById('histHDR');
+
+  const canvases = [cStd, cHDR, cHistStd, cHistHDR];
+  const contexts = {};
+
+  canvases.forEach(c => {
+    const w = c.width;
+    const h = c.height;
+    c.width = w * DPR;
+    c.height = h * DPR;
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+    const ctx = c.getContext('2d');
+    ctx.scale(DPR, DPR);
+    contexts[c.id] = ctx;
+  });
+
+  const W_SCENE = 420;
+  const H_SCENE = 280;
+  const W_HIST = 420;
+  const H_HIST = 120;
+
+  // State
+  let exposure = 0;
+  let sceneDR = 14;
+  let sensorBits = 10;
+  let hdrMode = false;
+
+  // Scene definition: zones with luminance values (in stops relative to middle gray)
+  // Positive = brighter than mid, negative = darker
+  const scene = [
+    // Sky / bright window
+    { x: 0, y: 0, w: W_SCENE, h: 80, baseEV: 6, color: [135, 180, 230] },
+    // Sun / light source
+    { x: 160, y: 10, w: 100, h: 50, baseEV: 10, color: [255, 245, 200] },
+    // Clouds
+    { x: 30, y: 20, w: 90, h: 40, baseEV: 4, color: [200, 210, 225] },
+    { x: 280, y: 15, w: 110, h: 45, baseEV: 3.5, color: [190, 200, 215] },
+    // Building far
+    { x: 0, y: 80, w: 140, h: 120, baseEV: 1, color: [100, 95, 85] },
+    // Building mid
+    { x: 120, y: 70, w: 100, h: 130, baseEV: 0.5, color: [120, 110, 100] },
+    // Building windows (bright reflections)
+    { x: 135, y: 85, w: 18, h: 14, baseEV: 7, color: [240, 230, 200] },
+    { x: 165, y: 85, w: 18, h: 14, baseEV: 6.5, color: [230, 220, 195] },
+    { x: 135, y: 110, w: 18, h: 14, baseEV: 2, color: [80, 90, 110] },
+    { x: 165, y: 110, w: 18, h: 14, baseEV: 1.5, color: [70, 80, 100] },
+    { x: 135, y: 135, w: 18, h: 14, baseEV: 1, color: [60, 70, 90] },
+    { x: 165, y: 135, w: 18, h: 14, baseEV: 5, color: [200, 190, 170] },
+    // Building right
+    { x: 260, y: 65, w: 160, h: 135, baseEV: -0.5, color: [80, 75, 70] },
+    // Dark windows right
+    { x: 280, y: 90, w: 20, h: 16, baseEV: -3, color: [30, 30, 35] },
+    { x: 315, y: 90, w: 20, h: 16, baseEV: -2.5, color: [35, 35, 40] },
+    { x: 350, y: 90, w: 20, h: 16, baseEV: -4, color: [20, 22, 28] },
+    { x: 280, y: 120, w: 20, h: 16, baseEV: -3.5, color: [25, 25, 30] },
+    { x: 315, y: 120, w: 20, h: 16, baseEV: -2, color: [40, 40, 48] },
+    { x: 350, y: 120, w: 20, h: 16, baseEV: -3, color: [30, 30, 36] },
+    // Street level
+    { x: 0, y: 200, w: W_SCENE, h: 80, baseEV: -1, color: [65, 60, 55] },
+    // Road
+    { x: 0, y: 230, w: W_SCENE, h: 50, baseEV: -2, color: [50, 48, 45] },
+    // Puddle reflection
+    { x: 150, y: 240, w: 120, h: 30, baseEV: 4, color: [160, 170, 190] },
+    // Shadow under building
+    { x: 0, y: 200, w: 140, h: 30, baseEV: -5, color: [18, 16, 15] },
+    // Deep shadow corner
+    { x: 0, y: 230, w: 60, h: 50, baseEV: -7, color: [8, 7, 6] },
+    // Car body (dark)
+    { x: 300, y: 210, w: 80, h: 35, baseEV: -1.5, color: [45, 40, 42] },
+    // Car windshield (bright reflection)
+    { x: 310, y: 210, w: 40, h: 15, baseEV: 5.5, color: [210, 215, 225] },
+    // Streetlight glow
+    { x: 218, y: 190, w: 8, h: 12, baseEV: 8, color: [255, 230, 160] },
+    // Streetlight halo
+    { x: 206, y: 182, w: 32, h: 28, baseEV: 3, color: [180, 165, 120] },
+  ];
+
+  // Sensor DR based on bit depth
+  function getSensorDR(bits) {
+    // Approximate: 8-bit ~ 6 stops, 10 ~ 10, 12 ~ 12, 14 ~ 14
+    const map = { 8: 6, 10: 10, 12: 12, 14: 14 };
+    return map[bits] || 10;
+  }
+
+  // Apply exposure and clipping to a luminance value
+  function applyExposure(baseEV, exposureComp, sensorDR, doClip) {
+    // Shift by exposure compensation
+    const adjustedEV = baseEV + exposureComp;
+    // Sensor captures from -sensorDR/2 to +sensorDR/2 around middle gray
+    const lo = -sensorDR / 2;
+    const hi = sensorDR / 2;
+    if (doClip) {
+      if (adjustedEV > hi) return { val: 1, clipped: 'highlight' };
+      if (adjustedEV < lo) return { val: 0, clipped: 'shadow' };
+    }
+    // Map to 0-1
+    let val = (adjustedEV - lo) / (hi - lo);
+    val = Math.max(0, Math.min(1, val));
+    return { val, clipped: null };
+  }
+
+  // Tone map color based on exposure result
+  function toneMapColor(baseColor, val, clipped) {
+    if (clipped === 'highlight') return [255, 255, 255];
+    if (clipped === 'shadow') return [0, 0, 0];
+    // Apply gamma-like curve
+    const g = Math.pow(val, 0.85);
+    return baseColor.map(c => Math.round(c * g));
+  }
+
+  function drawScene(ctx, w, h, exposureComp, sensorDR, isHDR) {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, w, h);
+
+    let highlightClips = 0;
+    let shadowClips = 0;
+    let totalPixels = 0;
+
+    // For HDR: simulate multi-exposure merge
+    // We expand the effective sensor DR
+    const effectiveDR = isHDR ? Math.min(sceneDR, sensorDR + 6) : sensorDR;
+
+    scene.forEach(zone => {
+      // Scale baseEV to scene DR
+      const scaledEV = zone.baseEV * (sceneDR / 14);
+      const result = applyExposure(scaledEV, exposureComp, effectiveDR, true);
+      const color = toneMapColor(zone.color, result.val, result.clipped);
+
+      ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+      ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+
+      const area = zone.w * zone.h;
+      totalPixels += area;
+      if (result.clipped === 'highlight') highlightClips += area;
+      if (result.clipped === 'shadow') shadowClips += area;
+    });
+
+    return {
+      highlightPct: (highlightClips / totalPixels * 100),
+      shadowPct: (shadowClips / totalPixels * 100),
+      totalClipPct: ((highlightClips + shadowClips) / totalPixels * 100)
+    };
+  }
+
+  function buildHistogram(exposureComp, sensorDR, isHDR) {
+    const bins = new Array(256).fill(0);
+    const effectiveDR = isHDR ? Math.min(sceneDR, sensorDR + 6) : sensorDR;
+
+    scene.forEach(zone => {
+      const scaledEV = zone.baseEV * (sceneDR / 14);
+      const result = applyExposure(scaledEV, exposureComp, effectiveDR, true);
+      let val = result.val;
+      if (result.clipped === 'highlight') val = 1;
+      if (result.clipped === 'shadow') val = 0;
+
+      const bin = Math.min(255, Math.max(0, Math.round(val * 255)));
+      const area = zone.w * zone.h;
+      bins[bin] += area;
+    });
+    return bins;
+  }
+
+  function drawHistogram(ctx, w, h, bins, isHDR) {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, w, h);
+
+    const maxBin = Math.max(...bins, 1);
+    const barW = w / 256;
+    const pad = 10;
+    const drawH = h - pad * 2;
+
+    for (let i = 0; i < 256; i++) {
+      const barH = (bins[i] / maxBin) * drawH;
+      if (barH < 0.5) continue;
+
+      // Color: red at edges if clipping, gold/blue middle
+      let r, g, b;
+      if (i <= 2) {
+        r = 64; g = 128; b = 208; // shadow clip blue
+      } else if (i >= 253) {
+        r = 217; g = 64; b = 64; // highlight clip red
+      } else if (isHDR) {
+        r = 232; g = 182; b = 0; // gold
+      } else {
+        const t = i / 255;
+        r = Math.round(80 + t * 100);
+        g = Math.round(80 + t * 80);
+        b = Math.round(80 + t * 60);
+      }
+
+      ctx.fillStyle = `rgba(${r},${g},${b},0.8)`;
+      ctx.fillRect(i * barW, pad + drawH - barH, Math.max(barW - 0.5, 1), barH);
+    }
+
+    // Axis line
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, pad + drawH);
+    ctx.lineTo(w, pad + drawH);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#333';
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText('Shadows', 4, h - 2);
+    ctx.textAlign = 'right';
+    ctx.fillText('Highlights', w - 4, h - 2);
+  }
+
+  function updateBracketBar(stdClip, sensorDR) {
+    const effectiveDR = hdrMode ? Math.min(sceneDR, sensorDR + 6) : sensorDR;
+    const lo = -effectiveDR / 2 + exposure;
+    const hi = effectiveDR / 2 + exposure;
+    const sceneLo = -sceneDR / 2;
+    const sceneHi = sceneDR / 2;
+
+    // How much of the scene range is captured
+    const capturedLo = Math.max(sceneLo, lo);
+    const capturedHi = Math.min(sceneHi, hi);
+
+    const totalRange = sceneHi - sceneLo;
+    const shadowPct = Math.max(0, (capturedLo - sceneLo) / totalRange * 100);
+    const highlightPct = Math.max(0, (sceneHi - capturedHi) / totalRange * 100);
+    const midPct = 100 - shadowPct - highlightPct;
+
+    const bShadow = document.getElementById('bShadow');
+    const bMid = document.getElementById('bMid');
+    const bHighlight = document.getElementById('bHighlight');
+    const bClipped = document.getElementById('bClipped');
+
+    // The captured range is the middle
+    bShadow.style.width = Math.max(0, shadowPct) + '%';
+    bMid.style.width = Math.max(0, midPct) + '%';
+    bHighlight.style.width = Math.max(0, highlightPct) + '%';
+
+    // Show shadow text only if visible
+    bShadow.textContent = shadowPct > 10 ? 'Clipped' : '';
+    bHighlight.textContent = highlightPct > 10 ? 'Clipped' : '';
+    bMid.textContent = midPct > 20 ? 'Captured' : '';
+
+    // Clipped overlay: hatching on clipped regions
+    if (shadowPct > 0 || highlightPct > 0) {
+      // Show clipped bar over shadow region (left) and highlight region (right)
+      bClipped.style.display = 'block';
+      bClipped.style.left = '0';
+      bClipped.style.width = shadowPct + '%';
+      // We need a second element or use pseudo. Simpler: just shade both ends
+      // Actually let's just shade the shadow side and style highlight separately
+      bShadow.style.background = 'repeating-linear-gradient(45deg, rgba(64,128,208,0.2), rgba(64,128,208,0.2) 3px, rgba(64,128,208,0.05) 3px, rgba(64,128,208,0.05) 6px)';
+      bHighlight.style.background = 'repeating-linear-gradient(45deg, rgba(217,64,64,0.2), rgba(217,64,64,0.2) 3px, rgba(217,64,64,0.05) 3px, rgba(217,64,64,0.05) 6px)';
+    } else {
+      bClipped.style.display = 'none';
+      bShadow.style.background = '#1a2a40';
+      bHighlight.style.background = '#3a2010';
+    }
+
+    if (hdrMode) {
+      bMid.style.background = 'linear-gradient(90deg, #1a2a20, #1a1a10, #2a2010)';
+      bMid.style.color = '#E8B600';
+    } else {
+      bMid.style.background = '#1a1a10';
+      bMid.style.color = '#888';
+    }
+  }
+
+  function render() {
+    const sensorDR = getSensorDR(sensorBits);
+    const ctxStd = contexts.sceneStd;
+    const ctxHDR = contexts.sceneHDR;
+    const ctxHistStd = contexts.histStd;
+    const ctxHistHDR = contexts.histHDR;
+
+    // Draw standard scene
+    const stdClip = drawScene(ctxStd, W_SCENE, H_SCENE, exposure, sensorDR, false);
+    // Draw HDR scene
+    const hdrClip = drawScene(ctxHDR, W_SCENE, H_SCENE, exposure, sensorDR, true);
+
+    // Histograms
+    const binsStd = buildHistogram(exposure, sensorDR, false);
+    const binsHDR = buildHistogram(exposure, sensorDR, true);
+    drawHistogram(ctxHistStd, W_HIST, H_HIST, binsStd, false);
+    drawHistogram(ctxHistHDR, W_HIST, H_HIST, binsHDR, true);
+
+    // Clip indicators
+    const clipStdEl = document.getElementById('clipStd');
+    if (stdClip.totalClipPct > 1) {
+      if (stdClip.highlightPct > stdClip.shadowPct) {
+        clipStdEl.textContent = Math.round(stdClip.highlightPct) + '% blown';
+        clipStdEl.className = 'clip-indicator clip-highlight';
+      } else {
+        clipStdEl.textContent = Math.round(stdClip.shadowPct) + '% crushed';
+        clipStdEl.className = 'clip-indicator clip-shadow';
+      }
+    } else {
+      clipStdEl.textContent = 'No clipping';
+      clipStdEl.className = 'clip-indicator clip-none';
+    }
+
+    const clipHDREl = document.getElementById('clipHDR');
+    if (hdrClip.totalClipPct > 1) {
+      clipHDREl.textContent = Math.round(hdrClip.totalClipPct) + '% clipped';
+      clipHDREl.className = 'clip-indicator clip-highlight';
+    } else {
+      clipHDREl.textContent = 'Full range captured';
+      clipHDREl.className = 'clip-indicator clip-none';
+    }
+
+    // Stats
+    document.getElementById('statSensorDR').textContent = sensorDR;
+    document.getElementById('statSceneDR').textContent = sceneDR;
+
+    const clippedPct = stdClip.totalClipPct;
+    const statClippedEl = document.getElementById('statClipped');
+    statClippedEl.textContent = Math.round(clippedPct) + '%';
+    statClippedEl.className = clippedPct > 5 ? 'stat-val red' : 'stat-val green';
+
+    const recovered = Math.max(0, clippedPct - hdrClip.totalClipPct);
+    const statRecoveredEl = document.getElementById('statRecovered');
+    statRecoveredEl.textContent = Math.round(recovered) + '%';
+    statRecoveredEl.className = recovered > 0 ? 'stat-val green' : 'stat-val';
+
+    const tones = Math.pow(2, sensorBits);
+    document.getElementById('statTones').textContent = tones.toLocaleString();
+
+    // Bracket bar
+    updateBracketBar(stdClip, sensorDR);
+  }
+
+  // Exposure slider
+  const exposureSlider = document.getElementById('exposureSlider');
+  const exposureVal = document.getElementById('exposureVal');
+  exposureSlider.addEventListener('input', () => {
+    exposure = parseFloat(exposureSlider.value);
+    const sign = exposure > 0 ? '+' : '';
+    exposureVal.textContent = sign + exposure.toFixed(1) + ' EV';
+    render();
+  });
+
+  // Scene DR slider
+  const sceneSlider = document.getElementById('sceneDRSlider');
+  const sceneDRVal = document.getElementById('sceneDRVal');
+  sceneSlider.addEventListener('input', () => {
+    sceneDR = parseInt(sceneSlider.value);
+    sceneDRVal.textContent = sceneDR + ' stops';
+    render();
+  });
+
+  // Mode toggle
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      hdrMode = btn.dataset.mode === 'hdr';
+      render();
+    });
+  });
+
+  // Bit depth presets
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      sensorBits = parseInt(btn.dataset.bits);
+      render();
+    });
+  });
+
+  // Intersection observer
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) render();
+    });
+  }, { threshold: 0.25 });
+  observer.observe(document.querySelector('.container'));
+
+  // Initial render
+  render();
+})();
+</script>
+</body>
+</html>

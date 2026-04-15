@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-006: Multi-Camera Stereo/PIV Setup</title>
+<meta property="og:title" content="ITD-006: Multi-Camera Stereo/PIV Setup">
+<meta property="og:description" content="Place cameras, adjust baseline, see how geometry affects depth resolution.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #E8B600;
+    --gold-dim: rgba(232,182,0,0.5);
+    --gold-glow: rgba(232,182,0,0.12);
+    --gold-faint: rgba(232,182,0,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --green: #22c55e;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #f0d060);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin-right: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+
+  .subtitle {
+    font-size: 0.92em;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 20px 0;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+  .panel:nth-of-type(3) { animation-delay: 0.6s; }
+  .panel:nth-of-type(4) { animation-delay: 0.7s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  /* ── CANVAS ── */
+  .canvas-wrap {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  #setupCanvas {
+    width: 100%;
+    height: 460px;
+    display: block;
+    cursor: default;
+  }
+
+  /* ── CONTROLS ── */
+  .ctrl-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toggle-wrap {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .toggle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 6px 14px;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+  }
+  .toggle-btn:hover { color: var(--text); transform: translateY(-1px); }
+  .toggle-btn.active {
+    background: var(--gold);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
+  /* Slider */
+  .slider-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .slider-group label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    color: var(--text-dim);
+    min-width: 66px;
+  }
+  .slider-group input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    outline: none;
+  }
+  .slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .slider-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+  input[type="range"]::-moz-range-track {
+    background: var(--border-hover);
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: var(--gold);
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: var(--gold);
+    min-width: 44px;
+    text-align: right;
+  }
+
+  /* ── READOUTS ── */
+  .readout-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .readout {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .readout:hover { transform: translateY(-2px); border-color: var(--border-hover); }
+  .readout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .readout-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--gold);
+  }
+  .readout-unit {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    color: var(--text-dim);
+    margin-top: 1px;
+  }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    color: var(--text-dim);
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 6px;
+    border-radius: 2px;
+  }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(232,182,0,0.2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p { font-size: 0.88em; color: var(--text); line-height: 1.65; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+  }
+  .itd-footer a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .itd-footer a:hover { color: #f0d060; }
+
+  @media (max-width: 640px) {
+    .container { padding: 20px 14px 32px; }
+    h1 { font-size: 1.3em; }
+    #setupCanvas { height: 360px; }
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    .slider-group { min-width: 160px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="itd-tag">ITD-006 / Interactive Technical Diagram</div>
+  <h1>Multi-Camera Stereo/PIV Setup</h1>
+  <p class="subtitle">Place cameras, adjust baseline, see how geometry affects depth resolution.</p>
+
+  <div class="panel">
+    <div class="panel-label">Bird's-Eye View: Flow Channel</div>
+    <div class="canvas-wrap">
+      <canvas id="setupCanvas"></canvas>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#4080D0"></div> Camera</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(232,182,0,0.15)"></div> Measurement volume</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(64,176,96,0.2)"></div> Triangulation lines</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(100,100,100,0.1)"></div> Flow channel</div>
+    </div>
+
+    <div class="ctrl-row">
+      <div class="toggle-wrap" id="modeToggle">
+        <button class="toggle-btn active" data-mode="stereo">Stereo Pair (2 cam)</button>
+        <button class="toggle-btn" data-mode="volumetric">Volumetric (4 cam)</button>
+      </div>
+    </div>
+
+    <div class="ctrl-row">
+      <div class="slider-group">
+        <label>Baseline</label>
+        <input type="range" id="baselineSlider" min="20" max="100" value="50">
+        <span class="slider-val" id="baselineVal">50%</span>
+      </div>
+      <div class="slider-group">
+        <label>Convergence</label>
+        <input type="range" id="convergenceSlider" min="10" max="90" value="50">
+        <span class="slider-val" id="convergenceVal">50%</span>
+      </div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout">
+        <div class="readout-label">Cameras</div>
+        <div class="readout-value" id="rdCamCount">2</div>
+        <div class="readout-unit">active</div>
+      </div>
+      <div class="readout">
+        <div class="readout-label">Baseline</div>
+        <div class="readout-value" id="rdBaseline">300</div>
+        <div class="readout-unit">mm</div>
+      </div>
+      <div class="readout">
+        <div class="readout-label">Depth Resolution</div>
+        <div class="readout-value" id="rdDepthRes">--</div>
+        <div class="readout-unit">relative</div>
+      </div>
+      <div class="readout">
+        <div class="readout-label">Reconstruction</div>
+        <div class="readout-value" id="rdRecon">2D</div>
+        <div class="readout-unit">type</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p><strong>Baseline and depth:</strong> Wider camera spacing (larger baseline) increases depth resolution because the triangulation angle between cameras grows. But too wide and the overlap region shrinks, reducing the usable measurement volume. Stereo PIV with two cameras recovers 2D velocity fields (two in-plane components). Adding a third and fourth camera at orthogonal angles enables tomographic or volumetric reconstruction of all three velocity components in 3D space.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-006</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Stereo / PIV Geometry</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Drag + Sliders</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Author</span>
+      <span class="spec-value">ciamac.com</span>
+    </div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-006 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('setupCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  // ── INTERSECTION OBSERVER ──
+  // Pause drawing when canvas is not visible (no RAF loop, but guards
+  // event-driven draw calls to avoid off-screen rendering work).
+  let canvasVisible = true;
+  const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      canvasVisible = entry.isIntersecting;
+    });
+  }, { threshold: 0.05 });
+  observer.observe(canvas);
+
+  let W, H;
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    W = rect.width;
+    H = rect.height;
+  }
+  resize();
+
+  // ── STATE ──
+  let mode = 'stereo'; // 'stereo' or 'volumetric'
+  let baseline = 50;   // 0-100 slider
+  let convergence = 50; // 0-100 slider
+  let hoveredCam = -1;
+  let dragCam = -1;
+  let dragOffset = { x: 0, y: 0 };
+
+  // Camera positions in scene coords (center = 0,0)
+  // Stereo: 2 cameras, one left one right of channel
+  // Volumetric: 4 cameras surrounding the channel
+  let camPositions = [];
+
+  const CAM_R = 12;
+  const CHANNEL_W = 200; // flow channel width in scene units
+  const CHANNEL_H = 400; // flow channel length
+
+  function sceneScale() { return Math.min(W / 700, H / 550); }
+  function cx() { return W / 2; }
+  function cy() { return H / 2; }
+
+  function toCanvas(sx, sy) {
+    const s = sceneScale();
+    return { x: cx() + sx * s, y: cy() + sy * s };
+  }
+  function toScene(px, py) {
+    const s = sceneScale();
+    return { x: (px - cx()) / s, y: (py - cy()) / s };
+  }
+
+  function computeCamPositions() {
+    // Baseline maps to distance from center (100-300 scene units per side)
+    const spread = 100 + baseline * 2;
+    // Convergence maps to how much cameras angle inward
+    const conv = convergence / 100;
+
+    if (mode === 'stereo') {
+      camPositions = [
+        { sx: -spread, sy: 0, angle: conv * 0.6 },       // left cam, angled right
+        { sx: spread, sy: 0, angle: Math.PI - conv * 0.6 } // right cam, angled left
+      ];
+    } else {
+      camPositions = [
+        { sx: -spread, sy: 0, angle: conv * 0.6 },
+        { sx: spread, sy: 0, angle: Math.PI - conv * 0.6 },
+        { sx: 0, sy: -spread * 0.85, angle: Math.PI / 2 + conv * 0.3 - 0.15 },
+        { sx: 0, sy: spread * 0.85, angle: -Math.PI / 2 - conv * 0.3 + 0.15 }
+      ];
+    }
+  }
+
+  // ── DOM ──
+  const baselineSlider = document.getElementById('baselineSlider');
+  const convergenceSlider = document.getElementById('convergenceSlider');
+  const baselineVal = document.getElementById('baselineVal');
+  const convergenceVal = document.getElementById('convergenceVal');
+  const rdCamCount = document.getElementById('rdCamCount');
+  const rdBaseline = document.getElementById('rdBaseline');
+  const rdDepthRes = document.getElementById('rdDepthRes');
+  const rdRecon = document.getElementById('rdRecon');
+
+  baselineSlider.addEventListener('input', function() {
+    baseline = parseInt(this.value);
+    baselineVal.textContent = this.value + '%';
+    computeCamPositions();
+    draw();
+    updateReadouts();
+  });
+
+  convergenceSlider.addEventListener('input', function() {
+    convergence = parseInt(this.value);
+    convergenceVal.textContent = this.value + '%';
+    computeCamPositions();
+    draw();
+    updateReadouts();
+  });
+
+  document.querySelectorAll('#modeToggle .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      mode = this.dataset.mode;
+      document.querySelectorAll('#modeToggle .toggle-btn').forEach(b => b.classList.toggle('active', b === this));
+      computeCamPositions();
+      draw();
+      updateReadouts();
+    });
+  });
+
+  function updateReadouts() {
+    const numCams = mode === 'stereo' ? 2 : 4;
+    rdCamCount.textContent = numCams;
+
+    const baselineMM = Math.round(100 + baseline * 4);
+    rdBaseline.textContent = baselineMM;
+
+    // Depth resolution is proportional to baseline (wider = better)
+    // and camera count (more cameras = better 3D)
+    const depthScore = (baseline / 100) * (numCams === 4 ? 1.4 : 1.0);
+    let depthLabel;
+    if (depthScore < 0.3) depthLabel = 'Low';
+    else if (depthScore < 0.6) depthLabel = 'Medium';
+    else if (depthScore < 0.9) depthLabel = 'High';
+    else depthLabel = 'Very High';
+    rdDepthRes.textContent = depthLabel;
+
+    rdRecon.textContent = mode === 'stereo' ? '2D + depth' : '3D volume';
+  }
+
+  // ── DRAWING ──
+
+  function drawFlowChannel() {
+    const s = sceneScale();
+    const cw = CHANNEL_W * s;
+    const ch = CHANNEL_H * s;
+    const x = cx() - cw / 2;
+    const y = cy() - ch / 2;
+
+    // Channel body
+    ctx.fillStyle = 'rgba(100, 100, 100, 0.04)';
+    ctx.strokeStyle = '#1e1e1e';
+    ctx.lineWidth = 1;
+    ctx.fillRect(x, y, cw, ch);
+    ctx.strokeRect(x, y, cw, ch);
+
+    // Flow direction arrows
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    const arrowSpacing = 50 * s;
+    for (let ay = y + 30; ay < y + ch - 20; ay += arrowSpacing) {
+      ctx.beginPath();
+      ctx.moveTo(cx(), ay);
+      ctx.lineTo(cx(), ay - 16 * s);
+      ctx.stroke();
+      // Arrowhead
+      ctx.beginPath();
+      ctx.moveTo(cx(), ay - 16 * s);
+      ctx.lineTo(cx() - 4, ay - 10 * s);
+      ctx.moveTo(cx(), ay - 16 * s);
+      ctx.lineTo(cx() + 4, ay - 10 * s);
+      ctx.stroke();
+    }
+
+    // Label
+    ctx.font = `500 8px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    ctx.save();
+    ctx.translate(x + cw + 14, cy());
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('FLOW DIRECTION', 0, 0);
+    ctx.restore();
+
+    // Channel label
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    ctx.fillText('FLOW CHANNEL', cx(), y - 8);
+  }
+
+  function drawMeasurementVolume() {
+    if (camPositions.length < 2) return;
+    const s = sceneScale();
+
+    // Compute overlap region of all camera FOVs
+    // Simplified: draw the intersection polygon of convergence lines
+    // For stereo: a diamond/rhombus where the two FOV cones overlap
+    // For volumetric: a smaller central region
+
+    const fovHalf = 0.4; // half-FOV in radians (illustrative)
+    const range = 250 * s;
+
+    // Collect all convergence intersection points near center
+    const points = [];
+
+    for (let i = 0; i < camPositions.length; i++) {
+      const cam = camPositions[i];
+      const p = toCanvas(cam.sx, cam.sy);
+      const a1 = cam.angle - fovHalf;
+      const a2 = cam.angle + fovHalf;
+
+      // Left and right FOV edge endpoints
+      const l1 = { x: p.x + Math.cos(a1) * range, y: p.y + Math.sin(a1) * range };
+      const r1 = { x: p.x + Math.cos(a2) * range, y: p.y + Math.sin(a2) * range };
+
+      // For next camera, find intersection
+      const j = (i + 1) % camPositions.length;
+      const cam2 = camPositions[j];
+      const p2 = toCanvas(cam2.sx, cam2.sy);
+      const b1 = cam2.angle - fovHalf;
+      const b2 = cam2.angle + fovHalf;
+
+      // Find intersection of FOV edges
+      function lineIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+        const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denom) < 0.001) return null;
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
+      }
+
+      // Each pair of adjacent cameras contributes intersection points
+      const int1 = lineIntersect(p.x, p.y, l1.x, l1.y, p2.x, p2.y, p2.x + Math.cos(b2) * range, p2.y + Math.sin(b2) * range);
+      const int2 = lineIntersect(p.x, p.y, r1.x, r1.y, p2.x, p2.y, p2.x + Math.cos(b1) * range, p2.y + Math.sin(b1) * range);
+
+      if (int1) points.push(int1);
+      if (int2) points.push(int2);
+    }
+
+    // Draw measurement volume as polygon
+    if (points.length >= 3) {
+      // Sort points by angle from centroid
+      const centX = points.reduce((s, p) => s + p.x, 0) / points.length;
+      const centY = points.reduce((s, p) => s + p.y, 0) / points.length;
+      points.sort((a, b) => Math.atan2(a.y - centY, a.x - centX) - Math.atan2(b.y - centY, b.x - centX));
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(232, 182, 0, 0.08)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(232, 182, 0, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  function drawTriangulationLines() {
+    const s = sceneScale();
+    // Draw lines from each camera to the center of the measurement volume
+    const target = toCanvas(0, 0);
+
+    camPositions.forEach((cam, i) => {
+      const p = toCanvas(cam.sx, cam.sy);
+
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.strokeStyle = 'rgba(64, 176, 96, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Cross-camera baseline lines
+    if (camPositions.length >= 2) {
+      for (let i = 0; i < camPositions.length; i++) {
+        for (let j = i + 1; j < camPositions.length; j++) {
+          const p1 = toCanvas(camPositions[i].sx, camPositions[i].sy);
+          const p2 = toCanvas(camPositions[j].sx, camPositions[j].sy);
+
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.strokeStyle = 'rgba(64, 176, 96, 0.06)';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+
+          // Baseline distance label at midpoint
+          const mx = (p1.x + p2.x) / 2;
+          const my = (p1.y + p2.y) / 2;
+          const dx = camPositions[j].sx - camPositions[i].sx;
+          const dy = camPositions[j].sy - camPositions[i].sy;
+          const dist = Math.round(Math.sqrt(dx * dx + dy * dy));
+
+          ctx.font = `8px "JetBrains Mono", monospace`;
+          ctx.fillStyle = 'rgba(64, 176, 96, 0.3)';
+          ctx.textAlign = 'center';
+          ctx.fillText(dist + ' mm', mx, my - 4);
+        }
+      }
+    }
+  }
+
+  function drawFOVCones() {
+    const s = sceneScale();
+    const fovHalf = 0.4;
+    const range = 250 * s;
+
+    camPositions.forEach((cam, i) => {
+      const p = toCanvas(cam.sx, cam.sy);
+      const a1 = cam.angle - fovHalf;
+      const a2 = cam.angle + fovHalf;
+
+      // Cone fill
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.arc(p.x, p.y, range, a1, a2);
+      ctx.closePath();
+      ctx.fillStyle = i === hoveredCam ? 'rgba(64, 128, 208, 0.1)' : 'rgba(64, 128, 208, 0.04)';
+      ctx.fill();
+
+      // Edges
+      ctx.strokeStyle = i === hoveredCam ? 'rgba(64, 128, 208, 0.35)' : 'rgba(64, 128, 208, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + Math.cos(a1) * range, p.y + Math.sin(a1) * range);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + Math.cos(a2) * range, p.y + Math.sin(a2) * range);
+      ctx.stroke();
+    });
+  }
+
+  function drawCameras() {
+    camPositions.forEach((cam, i) => {
+      const p = toCanvas(cam.sx, cam.sy);
+      const isHovered = i === hoveredCam;
+      const isDragging = i === dragCam;
+
+      // Outer glow
+      if (isHovered || isDragging) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, CAM_R + 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(64, 128, 208, 0.12)';
+        ctx.fill();
+      }
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, CAM_R, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered || isDragging ? '#4080D0' : '#4080D0cc';
+      ctx.fill();
+      ctx.strokeStyle = '#0c0c0c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Direction tick
+      ctx.beginPath();
+      ctx.moveTo(p.x + Math.cos(cam.angle) * CAM_R, p.y + Math.sin(cam.angle) * CAM_R);
+      ctx.lineTo(p.x + Math.cos(cam.angle) * (CAM_R + 6), p.y + Math.sin(cam.angle) * (CAM_R + 6));
+      ctx.strokeStyle = '#4080D0';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Label
+      ctx.font = `600 7px "JetBrains Mono", monospace`;
+      ctx.fillStyle = '#0c0c0c';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('C' + (i + 1), p.x, p.y + 0.5);
+
+      // Camera number label outside
+      ctx.font = `500 8px "JetBrains Mono", monospace`;
+      ctx.fillStyle = isHovered ? '#4080D0' : '#888';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText('Cam ' + (i + 1), p.x, p.y + CAM_R + 6);
+    });
+  }
+
+  function draw() {
+    if (!canvasVisible) return;
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid
+    const s = sceneScale();
+    const step = 50 * s;
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 0.5;
+    for (let x = cx() % step; x < W; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = cy() % step; y < H; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+
+    drawFlowChannel();
+    drawFOVCones();
+    drawMeasurementVolume();
+    drawTriangulationLines();
+    drawCameras();
+
+    // Scale bar
+    const barLen = 100 * s;
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(16, H - 16);
+    ctx.lineTo(16 + barLen, H - 16);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16, H - 20); ctx.lineTo(16, H - 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(16 + barLen, H - 20); ctx.lineTo(16 + barLen, H - 12); ctx.stroke();
+    ctx.font = `8px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#888';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'auto';
+    ctx.fillText('100 mm', 16 + barLen / 2, H - 22);
+
+    // Mode label
+    ctx.font = `600 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'right';
+    ctx.fillText(mode === 'stereo' ? 'STEREO PAIR' : 'VOLUMETRIC 3D', W - 14, 18);
+  }
+
+  // ── INTERACTION: DRAG CAMERAS ──
+
+  function findCamAt(px, py) {
+    const scene = toScene(px, py);
+    for (let i = camPositions.length - 1; i >= 0; i--) {
+      const dx = scene.x - camPositions[i].sx;
+      const dy = scene.y - camPositions[i].sy;
+      if (dx * dx + dy * dy < 600) return i;
+    }
+    return -1;
+  }
+
+  canvas.addEventListener('mousedown', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const idx = findCamAt(px, py);
+    if (idx >= 0) {
+      dragCam = idx;
+      const scene = toScene(px, py);
+      dragOffset.x = camPositions[idx].sx - scene.x;
+      dragOffset.y = camPositions[idx].sy - scene.y;
+      canvas.style.cursor = 'grabbing';
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+
+    if (dragCam >= 0) {
+      const scene = toScene(px, py);
+      camPositions[dragCam].sx = scene.x + dragOffset.x;
+      camPositions[dragCam].sy = scene.y + dragOffset.y;
+      // Recompute angle to point toward center
+      const cam = camPositions[dragCam];
+      cam.angle = Math.atan2(-cam.sy, -cam.sx);
+      draw();
+      updateReadouts();
+      return;
+    }
+
+    const idx = findCamAt(px, py);
+    if (idx !== hoveredCam) {
+      hoveredCam = idx;
+      canvas.style.cursor = idx >= 0 ? 'grab' : 'default';
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mouseup', function() {
+    dragCam = -1;
+    canvas.style.cursor = hoveredCam >= 0 ? 'grab' : 'default';
+  });
+
+  canvas.addEventListener('mouseleave', function() {
+    dragCam = -1;
+    hoveredCam = -1;
+    canvas.style.cursor = 'default';
+    draw();
+  });
+
+  // Scroll to rotate
+  canvas.addEventListener('wheel', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const idx = findCamAt(px, py);
+    if (idx >= 0) {
+      e.preventDefault();
+      camPositions[idx].angle += e.deltaY > 0 ? 0.06 : -0.06;
+      draw();
+    }
+  }, { passive: false });
+
+  // Touch support
+  let touchIdx = -1;
+  canvas.addEventListener('touchstart', function(e) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const px = touch.clientX - rect.left;
+    const py = touch.clientY - rect.top;
+    const idx = findCamAt(px, py);
+    if (idx >= 0) {
+      e.preventDefault();
+      touchIdx = idx;
+      const scene = toScene(px, py);
+      dragOffset.x = camPositions[idx].sx - scene.x;
+      dragOffset.y = camPositions[idx].sy - scene.y;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', function(e) {
+    if (touchIdx < 0) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const px = touch.clientX - rect.left;
+    const py = touch.clientY - rect.top;
+    const scene = toScene(px, py);
+    camPositions[touchIdx].sx = scene.x + dragOffset.x;
+    camPositions[touchIdx].sy = scene.y + dragOffset.y;
+    camPositions[touchIdx].angle = Math.atan2(-camPositions[touchIdx].sy, -camPositions[touchIdx].sx);
+    draw();
+    updateReadouts();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function() { touchIdx = -1; });
+
+  // ── RESIZE ──
+  window.addEventListener('resize', function() {
+    resize();
+    draw();
+  });
+
+  // ── INIT ──
+  computeCamPositions();
+  draw();
+  updateReadouts();
+
+})();
+</script>
+</body>
+</html>

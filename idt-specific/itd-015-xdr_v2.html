@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-015: XDR Extended Dynamic Range</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container {
+    width: 100%;
+    max-width: 940px;
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .header {
+    padding: 28px 32px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .header-left h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #E8B600;
+    margin-bottom: 6px;
+  }
+  .header-left h2 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+  .header-left .subtitle {
+    font-size: 0.85em;
+    color: #555;
+    margin-top: 4px;
+  }
+
+  /* Mode selector */
+  .mode-row {
+    display: flex;
+    gap: 0;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .mode-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    padding: 10px 18px;
+    background: transparent;
+    color: #555;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .mode-btn.active {
+    background: #E8B600;
+    color: #0c0c0c;
+    font-weight: 600;
+  }
+  .mode-btn:hover:not(.active) {
+    color: #999;
+    background: #1a1a1a;
+  }
+
+  /* Main canvas area */
+  .canvas-area {
+    padding: 0 32px 24px;
+  }
+  .canvas-wrap {
+    border: 1px solid #1e1e1e;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0a0a0a;
+  }
+  .canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Info strip below canvas */
+  .info-strip {
+    display: flex;
+    gap: 12px;
+    padding: 16px 32px 0;
+    flex-wrap: wrap;
+  }
+  .info-card {
+    flex: 1;
+    min-width: 140px;
+    background: #0a0a0a;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .info-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4em;
+    font-weight: 600;
+    color: #E8B600;
+    margin-bottom: 2px;
+  }
+  .info-val.green { color: #40B060; }
+  .info-val.red { color: #D94040; }
+  .info-val.blue { color: #4080D0; }
+  .info-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Scene comparison */
+  .scene-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 20px 32px 0;
+  }
+  .scene-panel {
+    position: relative;
+    border: 1px solid #1e1e1e;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0a0a0a;
+  }
+  .scene-panel canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .scene-label {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #999;
+    background: rgba(12,12,12,0.85);
+    padding: 4px 10px;
+    border-radius: 5px;
+    backdrop-filter: blur(6px);
+  }
+  .scene-label.gold { color: #E8B600; }
+
+  /* Controls */
+  .controls {
+    padding: 20px 32px 24px;
+  }
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .control-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 120px;
+  }
+  .slider-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  input[type="range"]::-moz-range-track {
+    background: #333;
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: #E8B600;
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #E8B600;
+    min-width: 70px;
+    text-align: right;
+  }
+
+  /* Stats strip */
+  .stats-strip {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 32px;
+    border-top: 1px solid #1e1e1e;
+    background: #0a0a0a;
+  }
+  .stat-item { text-align: center; }
+  .stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #E8B600;
+    margin-bottom: 3px;
+  }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>ITD-015</h1>
+      <h2>XDR: Extended Dynamic Range</h2>
+      <div class="subtitle">Multi-slope integration within a single frame</div>
+    </div>
+    <div class="mode-row">
+      <button class="mode-btn" data-mode="standard">Standard</button>
+      <button class="mode-btn active" data-mode="double">Double XDR</button>
+      <button class="mode-btn" data-mode="dual">Dual XDR</button>
+      <button class="mode-btn" data-mode="triple">Triple XDR</button>
+    </div>
+  </div>
+
+  <!-- Timing diagram -->
+  <div class="canvas-area">
+    <div class="canvas-wrap">
+      <canvas id="timingCanvas" width="876" height="340"></canvas>
+    </div>
+  </div>
+
+  <!-- Info cards -->
+  <div class="info-strip">
+    <div class="info-card">
+      <div class="info-val" id="infoSlopes">2</div>
+      <div class="info-label">Integration Slopes</div>
+    </div>
+    <div class="info-card">
+      <div class="info-val green" id="infoDR">72 dB</div>
+      <div class="info-label">Dynamic Range</div>
+    </div>
+    <div class="info-card">
+      <div class="info-val blue" id="infoKnees">1</div>
+      <div class="info-label">Knee Points</div>
+    </div>
+    <div class="info-card">
+      <div class="info-val" id="infoReadout">1x</div>
+      <div class="info-label">Readout Overhead</div>
+    </div>
+  </div>
+
+  <!-- Scene comparison -->
+  <div class="scene-row">
+    <div class="scene-panel">
+      <canvas id="sceneStd" width="430" height="240"></canvas>
+      <span class="scene-label">Standard</span>
+    </div>
+    <div class="scene-panel">
+      <canvas id="sceneXDR" width="430" height="240"></canvas>
+      <span class="scene-label gold">XDR Result</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-row">
+      <span class="control-label">Scene DR</span>
+      <div class="slider-wrap">
+        <input type="range" id="sceneDR" min="6" max="22" step="1" value="16">
+        <span class="slider-val" id="sceneDRVal">16 stops</span>
+      </div>
+    </div>
+    <div class="control-row">
+      <span class="control-label">Frame Period</span>
+      <div class="slider-wrap">
+        <input type="range" id="framePeriod" min="0" max="4" step="1" value="2">
+        <span class="slider-val" id="framePeriodVal">1 ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-strip">
+    <div class="stat-item">
+      <div class="stat-val" id="statFPS">1,000</div>
+      <div class="stat-label">Frame Rate (fps)</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statLong">900 us</div>
+      <div class="stat-label">Long Integration</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statShort">90 us</div>
+      <div class="stat-label">Short Integration</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statRatio">10:1</div>
+      <div class="stat-label">Exposure Ratio</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val" id="statBits">10-bit</div>
+      <div class="stat-label">Output Depth</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const DPR = window.devicePixelRatio || 1;
+
+  function initCanvas(id, w, h) {
+    const c = document.getElementById(id);
+    c.width = w * DPR;
+    c.height = h * DPR;
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+    const ctx = c.getContext('2d');
+    ctx.scale(DPR, DPR);
+    return { c, ctx, w, h };
+  }
+
+  const timing = initCanvas('timingCanvas', 876, 340);
+  const scStd = initCanvas('sceneStd', 430, 240);
+  const scXDR = initCanvas('sceneXDR', 430, 240);
+
+  // State
+  let mode = 'double'; // standard, double, dual, triple
+  let sceneDR = 16;
+  let framePeriodIdx = 2;
+  const framePeriods = [0.1, 0.5, 1, 5, 10]; // ms
+  const framePeriodLabels = ['100 us', '500 us', '1 ms', '5 ms', '10 ms'];
+
+  // Mode configs
+  const modes = {
+    standard: {
+      slopes: 1, knees: 0, drBonus: 0, readoutMult: '1x',
+      label: 'Standard', color: '#555',
+      integrations: [{ label: 'Full', fraction: 0.9, color: '#4080D0' }]
+    },
+    double: {
+      slopes: 2, knees: 1, drBonus: 4, readoutMult: '1.1x',
+      label: 'Double XDR', color: '#E8B600',
+      integrations: [
+        { label: 'Long (shadows)', fraction: 0.7, color: '#4080D0' },
+        { label: 'Short (highlights)', fraction: 0.18, color: '#E8B600' }
+      ]
+    },
+    dual: {
+      slopes: 2, knees: 1, drBonus: 6, readoutMult: '1.2x',
+      label: 'Dual XDR', color: '#E8B600',
+      integrations: [
+        { label: 'Long (shadows)', fraction: 0.55, color: '#4080D0' },
+        { label: 'Short (highlights)', fraction: 0.3, color: '#E8B600' }
+      ]
+    },
+    triple: {
+      slopes: 3, knees: 2, drBonus: 8, readoutMult: '1.4x',
+      label: 'Triple XDR', color: '#D94040',
+      integrations: [
+        { label: 'Long (shadows)', fraction: 0.45, color: '#4080D0' },
+        { label: 'Mid (midtones)', fraction: 0.22, color: '#40B060' },
+        { label: 'Short (highlights)', fraction: 0.12, color: '#E8B600' }
+      ]
+    }
+  };
+
+  // Animation
+  let animTime = 0;
+  let animFrame = null;
+
+  function drawTimingDiagram() {
+    const { ctx, w, h } = timing;
+    const m = modes[mode];
+    const framePeriodMs = framePeriods[framePeriodIdx];
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, w, h);
+
+    const padL = 100, padR = 40, padT = 50, padB = 60;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    // Time axis
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(padL + plotW, padT + plotH);
+    ctx.stroke();
+
+    // Frame period markers (show 2 frames)
+    const frameW = plotW / 2.2;
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+
+    for (let f = 0; f < 2; f++) {
+      const fx = padL + f * frameW * 1.05 + 10;
+
+      // Frame boundary
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(fx, padT);
+      ctx.lineTo(fx, padT + plotH + 20);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#333';
+      ctx.fillText('Frame ' + (f + 1), fx + frameW / 2, padT + plotH + 35);
+
+      // Frame period label
+      ctx.fillStyle = '#444';
+      ctx.fillText(framePeriodLabels[framePeriodIdx], fx + frameW / 2, padT + plotH + 50);
+
+      // Draw integration segments
+      const segs = m.integrations;
+      let segY = padT + 20;
+      const segH = Math.min(50, (plotH - 40) / Math.max(segs.length, 1) - 15);
+
+      segs.forEach((seg, i) => {
+        const segW = seg.fraction * frameW;
+        const segX = fx + (frameW - segW) * 0.05; // slight offset from left
+
+        // Integration bar
+        const alpha = 0.15 + 0.3 * Math.max(0, Math.sin(animTime * 2 - i * 0.5));
+        ctx.fillStyle = seg.color;
+        ctx.globalAlpha = 0.15;
+        ctx.fillRect(segX, segY, segW, segH);
+        ctx.globalAlpha = 1;
+
+        // Bar outline
+        ctx.strokeStyle = seg.color;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(segX, segY, segW, segH);
+
+        // Animated charge accumulation line (sawtooth rising)
+        ctx.beginPath();
+        ctx.strokeStyle = seg.color;
+        ctx.lineWidth = 2;
+        const steps = 60;
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps;
+          // Animated progress
+          const progress = Math.min(1, (animTime * 0.8 + f * 0.5) % 2);
+          const drawT = Math.min(t, progress);
+
+          const px = segX + drawT * segW;
+          // Charge curve: rises, steeper for short integration (more light per unit time to saturate)
+          const slopeMultiplier = i === 0 ? 0.7 : (i === 1 ? 1.5 : 2.5);
+          const charge = Math.min(1, drawT * slopeMultiplier);
+          const py = segY + segH - charge * segH;
+
+          if (s === 0) ctx.moveTo(px, segY + segH);
+          else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        // Knee point: where short integration saturates
+        if (i > 0 && segs.length > 1) {
+          const kneeT = 1 / (i === 1 ? 1.5 : 2.5);
+          const kneeX = segX + kneeT * segW;
+          ctx.fillStyle = '#D94040';
+          ctx.beginPath();
+          ctx.arc(kneeX, segY + 2, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#D94040';
+          ctx.font = '9px JetBrains Mono';
+          ctx.textAlign = 'left';
+          ctx.fillText('Knee ' + i, kneeX + 8, segY + 5);
+        }
+
+        // Reset pulse between segments
+        if (i < segs.length - 1) {
+          const resetX = segX + segW;
+          const resetW = (frameW - segs.reduce((a, s2) => a + s2.fraction * frameW, 0)) / segs.length;
+          ctx.fillStyle = 'rgba(217, 64, 64, 0.1)';
+          ctx.fillRect(resetX, segY, Math.max(resetW, 8), segH);
+          ctx.strokeStyle = '#D94040';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(resetX, segY, Math.max(resetW, 8), segH);
+          ctx.setLineDash([]);
+
+          // Reset arrow
+          const arrowX = resetX + Math.max(resetW, 8) / 2;
+          ctx.strokeStyle = '#D94040';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(arrowX, segY + 5);
+          ctx.lineTo(arrowX, segY + segH - 5);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(arrowX - 4, segY + segH - 10);
+          ctx.lineTo(arrowX, segY + segH - 5);
+          ctx.lineTo(arrowX + 4, segY + segH - 10);
+          ctx.stroke();
+        }
+
+        // Label
+        ctx.fillStyle = seg.color;
+        ctx.font = '10px JetBrains Mono';
+        ctx.textAlign = 'left';
+        ctx.fillText(seg.label, segX + 6, segY - 5);
+
+        // Duration
+        const durationUs = seg.fraction * framePeriodMs * 1000;
+        ctx.fillStyle = '#666';
+        ctx.font = '9px JetBrains Mono';
+        ctx.textAlign = 'right';
+        ctx.fillText(formatDuration(durationUs), segX + segW - 4, segY - 5);
+
+        segY += segH + 20;
+      });
+
+      // Readout bar at bottom
+      const readoutFrac = mode === 'standard' ? 0.1 : (mode === 'double' ? 0.12 : (mode === 'dual' ? 0.15 : 0.21));
+      const readoutW = readoutFrac * frameW;
+      const readoutX = fx + frameW - readoutW;
+      const readoutY = padT + plotH - 20;
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.1)';
+      ctx.fillRect(readoutX, readoutY, readoutW, 16);
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(readoutX, readoutY, readoutW, 16);
+      ctx.fillStyle = '#555';
+      ctx.font = '9px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.fillText('READOUT', readoutX + readoutW / 2, readoutY + 12);
+    }
+
+    // Y axis label
+    ctx.save();
+    ctx.translate(20, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#333';
+    ctx.font = '11px JetBrains Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText('Charge Accumulation', 0, 0);
+    ctx.restore();
+
+    // Voltage labels
+    ctx.fillStyle = '#333';
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText('Saturation', padL - 10, padT + 25);
+    ctx.fillText('Reset', padL - 10, padT + plotH - 25);
+
+    // Response curve inset (top right)
+    drawResponseInset(ctx, w - padR - 160, padT + 5, 150, 80);
+
+    // Title
+    ctx.fillStyle = modes[mode].color;
+    ctx.font = 'bold 12px JetBrains Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(m.label + ' — Integration Timing', padL, padT - 15);
+  }
+
+  function drawResponseInset(ctx, x, y, w, h) {
+    const m = modes[mode];
+
+    // Background
+    ctx.fillStyle = 'rgba(12,12,12,0.9)';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+
+    ctx.fillStyle = '#444';
+    ctx.font = `8px JetBrains Mono`;
+    ctx.textAlign = 'center';
+    ctx.fillText('RESPONSE CURVE', x + w / 2, y + 10);
+
+    const plotX = x + 15;
+    const plotY = y + 16;
+    const plotW2 = w - 30;
+    const plotH2 = h - 24;
+
+    // Axes
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.beginPath();
+    ctx.moveTo(plotX, plotY);
+    ctx.lineTo(plotX, plotY + plotH2);
+    ctx.lineTo(plotX + plotW2, plotY + plotH2);
+    ctx.stroke();
+
+    // Labels
+    ctx.fillStyle = '#333';
+    ctx.font = `7px JetBrains Mono`;
+    ctx.textAlign = 'left';
+    ctx.fillText('Light', plotX + plotW2 - 18, plotY + plotH2 + 7);
+    ctx.save();
+    ctx.translate(plotX - 7, plotY + plotH2 / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Signal', 0, 0);
+    ctx.restore();
+
+    if (mode === 'standard') {
+      // Single linear response
+      ctx.strokeStyle = '#4080D0';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(plotX, plotY + plotH2);
+      ctx.lineTo(plotX + plotW2 * 0.6, plotY);
+      // Clips
+      ctx.lineTo(plotX + plotW2, plotY);
+      ctx.stroke();
+    } else {
+      // Multi-slope: each segment has different slope
+      const segs = m.integrations;
+      ctx.lineWidth = 1.5;
+
+      // Long integration slope (steep)
+      ctx.strokeStyle = '#4080D0';
+      ctx.beginPath();
+      ctx.moveTo(plotX, plotY + plotH2);
+      const knee1X = plotX + plotW2 * 0.3;
+      const knee1Y = plotY + plotH2 * 0.35;
+      ctx.lineTo(knee1X, knee1Y);
+      ctx.stroke();
+
+      // Knee 1 dot
+      ctx.fillStyle = '#D94040';
+      ctx.beginPath();
+      ctx.arc(knee1X, knee1Y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (mode === 'triple') {
+        // Mid slope
+        ctx.strokeStyle = '#40B060';
+        ctx.beginPath();
+        ctx.moveTo(knee1X, knee1Y);
+        const knee2X = plotX + plotW2 * 0.6;
+        const knee2Y = plotY + plotH2 * 0.15;
+        ctx.lineTo(knee2X, knee2Y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#D94040';
+        ctx.beginPath();
+        ctx.arc(knee2X, knee2Y, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Short slope
+        ctx.strokeStyle = '#E8B600';
+        ctx.beginPath();
+        ctx.moveTo(knee2X, knee2Y);
+        ctx.lineTo(plotX + plotW2, plotY + plotH2 * 0.02);
+        ctx.stroke();
+      } else {
+        // Short slope (double/dual)
+        ctx.strokeStyle = '#E8B600';
+        ctx.beginPath();
+        ctx.moveTo(knee1X, knee1Y);
+        ctx.lineTo(plotX + plotW2, plotY + plotH2 * 0.05);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function formatDuration(us) {
+    if (us >= 1000) return (us / 1000).toFixed(1) + ' ms';
+    return Math.round(us) + ' us';
+  }
+
+  // Scene rendering
+  const scene = [
+    { x: 0, y: 0, w: 430, h: 70, ev: 7, col: [140, 185, 235] },
+    { x: 170, y: 5, w: 90, h: 45, ev: 11, col: [255, 248, 210] },
+    { x: 30, y: 15, w: 80, h: 35, ev: 4, col: [195, 205, 220] },
+    { x: 290, y: 10, w: 100, h: 40, ev: 3.5, col: [185, 195, 210] },
+    { x: 0, y: 70, w: 130, h: 100, ev: 1, col: [95, 90, 80] },
+    { x: 110, y: 60, w: 95, h: 110, ev: 0.5, col: [115, 105, 95] },
+    { x: 125, y: 75, w: 16, h: 12, ev: 7.5, col: [235, 225, 195] },
+    { x: 155, y: 75, w: 16, h: 12, ev: 7, col: [225, 215, 190] },
+    { x: 125, y: 100, w: 16, h: 12, ev: 1.5, col: [75, 85, 105] },
+    { x: 155, y: 100, w: 16, h: 12, ev: 5, col: [195, 185, 165] },
+    { x: 245, y: 55, w: 185, h: 115, ev: -0.5, col: [75, 70, 65] },
+    { x: 270, y: 75, w: 18, h: 14, ev: -3, col: [28, 28, 32] },
+    { x: 305, y: 75, w: 18, h: 14, ev: -4, col: [18, 20, 26] },
+    { x: 340, y: 75, w: 18, h: 14, ev: -2.5, col: [32, 32, 38] },
+    { x: 270, y: 105, w: 18, h: 14, ev: -3.5, col: [22, 22, 28] },
+    { x: 305, y: 105, w: 18, h: 14, ev: -2, col: [38, 38, 45] },
+    { x: 0, y: 170, w: 430, h: 70, ev: -1, col: [60, 55, 50] },
+    { x: 0, y: 200, w: 430, h: 40, ev: -2, col: [45, 43, 40] },
+    { x: 140, y: 205, w: 100, h: 25, ev: 4, col: [155, 165, 185] },
+    { x: 0, y: 170, w: 130, h: 25, ev: -5.5, col: [14, 12, 11] },
+    { x: 0, y: 195, w: 55, h: 45, ev: -7, col: [6, 5, 4] },
+    { x: 290, y: 178, w: 70, h: 30, ev: -1.5, col: [40, 36, 38] },
+    { x: 300, y: 178, w: 35, h: 13, ev: 6, col: [205, 210, 220] },
+    { x: 213, y: 160, w: 7, h: 10, ev: 9, col: [255, 225, 155] },
+    { x: 200, y: 153, w: 28, h: 24, ev: 3, col: [175, 160, 115] },
+  ];
+
+  function drawSceneCanvas(cvs, isXDR) {
+    const { ctx, w, h } = cvs;
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, w, h);
+
+    const m = modes[mode];
+    const baseDR = 10; // standard sensor DR in stops
+    const effectiveDR = isXDR ? baseDR + m.drBonus : baseDR;
+    const lo = -effectiveDR / 2;
+    const hi = effectiveDR / 2;
+
+    scene.forEach(zone => {
+      const scaledEV = zone.ev * (sceneDR / 16);
+      let val;
+      if (scaledEV > hi) val = 1;
+      else if (scaledEV < lo) val = 0;
+      else val = (scaledEV - lo) / (hi - lo);
+
+      let clippedHi = scaledEV > hi;
+      let clippedLo = scaledEV < lo;
+
+      let color;
+      if (clippedHi) color = [255, 255, 255];
+      else if (clippedLo) color = [0, 0, 0];
+      else {
+        const g = Math.pow(val, 0.85);
+        color = zone.col.map(c => Math.round(c * g));
+      }
+
+      ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+      ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+    });
+  }
+
+  function updateStats() {
+    const m = modes[mode];
+    const framePeriodMs = framePeriods[framePeriodIdx];
+    const fps = Math.round(1000 / framePeriodMs);
+
+    document.getElementById('infoSlopes').textContent = m.slopes;
+    document.getElementById('infoDR').textContent = (60 + m.drBonus * 3) + ' dB';
+    document.getElementById('infoKnees').textContent = m.knees;
+    document.getElementById('infoReadout').textContent = m.readoutMult;
+
+    document.getElementById('sceneDRVal').textContent = sceneDR + ' stops';
+    document.getElementById('framePeriodVal').textContent = framePeriodLabels[framePeriodIdx];
+
+    document.getElementById('statFPS').textContent = fps.toLocaleString();
+
+    // Integration durations
+    if (m.integrations.length > 0) {
+      const longUs = m.integrations[0].fraction * framePeriodMs * 1000;
+      document.getElementById('statLong').textContent = formatDuration(longUs);
+
+      if (m.integrations.length > 1) {
+        const shortUs = m.integrations[m.integrations.length - 1].fraction * framePeriodMs * 1000;
+        document.getElementById('statShort').textContent = formatDuration(shortUs);
+        const ratio = Math.round(longUs / shortUs);
+        document.getElementById('statRatio').textContent = ratio + ':1';
+      } else {
+        document.getElementById('statShort').textContent = '--';
+        document.getElementById('statRatio').textContent = '--';
+      }
+    }
+
+    const outputBits = mode === 'standard' ? '10-bit' : (mode === 'triple' ? '12-bit' : '10-bit');
+    document.getElementById('statBits').textContent = outputBits;
+  }
+
+  function render() {
+    drawTimingDiagram();
+    drawSceneCanvas(scStd, false);
+    drawSceneCanvas(scXDR, true);
+    updateStats();
+  }
+
+  function animate() {
+    animTime += 0.016;
+    drawTimingDiagram();
+    if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+    animFrame = requestAnimationFrame(animate);
+  }
+
+  // Mode buttons
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      render();
+    });
+  });
+
+  // Sliders
+  document.getElementById('sceneDR').addEventListener('input', e => {
+    sceneDR = parseInt(e.target.value);
+    render();
+  });
+  document.getElementById('framePeriod').addEventListener('input', e => {
+    framePeriodIdx = parseInt(e.target.value);
+    render();
+  });
+
+  // IntersectionObserver
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        render();
+        if (!animFrame) animate();
+      } else {
+        if (animFrame) {
+          cancelAnimationFrame(animFrame);
+          animFrame = null;
+        }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(document.querySelector('.container'));
+
+  render();
+  if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+  animate();
+})();
+</script>
+</body>
+</html>

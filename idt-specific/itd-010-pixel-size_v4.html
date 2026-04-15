@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-010: Pixel Size and Light Sensitivity</title>
+<meta property="og:title" content="ITD-010: Pixel Size and Light Sensitivity">
+<meta property="og:description" content="Bigger pixels catch more photons. That is the whole story.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --green: #22c55e;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin-right: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+
+  .subtitle {
+    font-size: 0.92em;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 20px 0;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+  .panel:nth-of-type(3) { animation-delay: 0.6s; }
+  .panel:nth-of-type(4) { animation-delay: 0.7s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  #sensorCanvas {
+    width: 100%;
+    height: 440px;
+    display: block;
+    border-radius: var(--radius-sm);
+  }
+
+  /* PIXEL SIZE SLIDER */
+  .px-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .px-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+  }
+  .px-slider-wrap {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .px-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    outline: none;
+  }
+  .px-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 8px var(--gold-glow);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .px-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+  input[type="range"]::-moz-range-track {
+    background: var(--border-hover);
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: var(--gold);
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.1);
+  }
+  .px-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: var(--gold);
+    min-width: 100px;
+    text-align: right;
+    letter-spacing: -0.5px;
+  }
+  .px-unit {
+    font-size: 0.55em;
+    font-weight: 400;
+    color: var(--text-dim);
+  }
+
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 5px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+  }
+  .preset:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .preset.active { border-color: var(--gold); color: var(--gold); background: var(--gold-faint); }
+  .preset-camera {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 1px;
+  }
+
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .readout-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+  }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: var(--text);
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: var(--gold); }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  .btn-primary { background: var(--gold); color: var(--bg); }
+  .btn-secondary { background: var(--surface-raised); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 12px;
+  }
+  .toggle-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-right: 6px;
+  }
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 7px 16px;
+    cursor: pointer;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: none;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .chip:hover { background: var(--surface); color: var(--text); }
+  .chip.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p { font-size: 0.88em; color: var(--text); line-height: 1.65; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+  }
+  .itd-footer a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #sensorCanvas { height: 360px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-010 / Interactive Technical Diagram</div>
+  <h1>Pixel Size and Light Sensitivity</h1>
+  <div class="subtitle">Bigger pixels catch more photons. That is the whole story.</div>
+
+  <div class="panel">
+    <div class="panel-label">Photon Collection</div>
+    <canvas id="sensorCanvas"></canvas>
+    <div class="controls">
+      <button class="btn btn-primary" id="btnPlay">Play</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Pixel Pitch</div>
+    <div class="px-row">
+      <span class="px-label">Size</span>
+      <div class="px-slider-wrap">
+        <input type="range" class="px-slider" id="pxSlider" min="0" max="5" step="1" value="2">
+      </div>
+      <div class="px-value" id="pxValue">7.0 <span class="px-unit">&micro;m</span></div>
+    </div>
+    <div class="preset-row" id="presetRow">
+      <button class="preset" data-idx="0">2.5 <span class="preset-camera">Helios</span></button>
+      <button class="preset" data-idx="1">4.4 <span class="preset-camera">SugarCube</span></button>
+      <button class="preset active" data-idx="2">7.0 <span class="preset-camera">XSM</span></button>
+      <button class="preset" data-idx="3">8.0 <span class="preset-camera">Galileo</span></button>
+      <button class="preset" data-idx="4">10.0 <span class="preset-camera">Phoenix</span></button>
+      <button class="preset" data-idx="5">11.6 <span class="preset-camera">XS II</span></button>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-group-label">Light</span>
+      <div class="toggle-group" id="lightToggle">
+        <button class="chip" data-light="low">Low</button>
+        <button class="chip active" data-light="mid">Mid</button>
+        <button class="chip" data-light="high">High</button>
+      </div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Pixel Area</div>
+        <div class="readout-card-value gold" id="cardArea">49.0 &micro;m&sup2;</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Relative Sensitivity</div>
+        <div class="readout-card-value" id="cardSens">1.0x</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Photon Count</div>
+        <div class="readout-card-value" id="cardPhotons">--</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Signal / Noise</div>
+        <div class="readout-card-value" id="cardSNR">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p>A pixel is a bucket for photons. A <strong>2.5 &micro;m</strong> pixel has an area of 6.25 &micro;m&sup2;. An <strong>11.6 &micro;m</strong> pixel has an area of 134.6 &micro;m&sup2;, collecting over 21 times more light from the same scene. This is why larger pitch sensors can reach ISO 30,000 while smaller pitch sensors sit closer to ISO 3,000. More photons per pixel means stronger signal relative to the sensor's read noise floor, which translates directly to cleaner images at the same exposure settings. The tradeoff is resolution. Fitting fewer, larger pixels onto the same sensor area means fewer total pixels.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-010</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Pixel Geometry</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Slider + Rain</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Author</span>
+      <span class="spec-value">ciamac.com</span>
+    </div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-010 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── PIXEL STEPS (real IDT sensor data) ──
+  const PX_STEPS = [
+    { um: 2.5,  camera: 'Helios 8K\u00B2',  iso: 3000 },
+    { um: 4.4,  camera: 'SugarCube',         iso: 10000 },
+    { um: 7.0,  camera: 'XSM HD',            iso: 30000 },
+    { um: 8.0,  camera: 'Galileo 5K',        iso: 30000 },
+    { um: 10.0, camera: 'Phoenix HD',         iso: 30000 },
+    { um: 11.6, camera: 'XS II HD',           iso: 30000 },
+  ];
+  const REF_AREA = 7.0 * 7.0; // reference area for 1x sensitivity
+
+  // ── PHOTON CAP ──
+  const MAX_PHOTONS = 800;
+
+  // ── STATE ──
+  let currentPxIdx = 2;
+  let lightLevel = 'mid'; // low | mid | high
+  let playing = false;
+  let animId = null;
+  let lastTime = 0;
+  let time = 0;
+
+  // Photon rain
+  let photons = [];
+  let capturedLeft = 0;
+  let capturedRight = 0;
+  let missedLeft = 0;
+  let missedRight = 0;
+
+  const LIGHT_RATES = { low: 40, mid: 120, high: 300 }; // photons per second
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('sensorCanvas');
+  const ctx = canvas.getContext('2d');
+  let dpr = window.devicePixelRatio || 1;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function resetPhotons() {
+    photons = [];
+    capturedLeft = 0;
+    capturedRight = 0;
+    missedLeft = 0;
+    missedRight = 0;
+  }
+
+  // ── DRAW ──
+  function draw() {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0, 0, w, h);
+
+    const px = PX_STEPS[currentPxIdx];
+    const refPx = PX_STEPS[2]; // 7um reference
+
+    // Layout: two side-by-side pixel cross-sections
+    const margin = 40;
+    const sectionW = (w - margin * 3) / 2;
+    const leftX = margin;
+    const rightX = margin * 2 + sectionW;
+
+    // Pixel visual sizes (scaled for visibility)
+    const maxVisualSize = Math.min(sectionW * 0.6, h * 0.35);
+    const smallPixelSize = maxVisualSize * (2.5 / 11.6); // smallest
+    const currentPixelSize = maxVisualSize * (px.um / 11.6);
+
+    // Reference pixel (always show smallest: 2.5um)
+    const refPixelSize = smallPixelSize;
+    const refCenterX = leftX + sectionW / 2;
+    const refCenterY = h * 0.55;
+
+    // Current pixel
+    const curCenterX = rightX + sectionW / 2;
+    const curCenterY = h * 0.55;
+
+    // ── SECTION LABELS ──
+    ctx.font = `500 10px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = '#555';
+    ctx.fillText('2.5 \u00B5m pixel', refCenterX, 24);
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#333';
+    ctx.fillText('Helios 8K\u00B2', refCenterX, 38);
+
+    ctx.font = `500 10px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#ffd94d';
+    ctx.fillText(`${px.um} \u00B5m pixel`, curCenterX, 24);
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#888';
+    ctx.fillText(px.camera, curCenterX, 38);
+
+    // ── RAIN ZONE INDICATORS ──
+    // Show the "sensor surface" area where photons fall
+    const rainW = sectionW * 0.8;
+    const rainTop = 50;
+    const rainBottom = refCenterY - maxVisualSize / 2 - 10;
+
+    // Faint rain zone
+    ctx.fillStyle = 'rgba(255,217,77,0.02)';
+    ctx.fillRect(leftX + (sectionW - rainW) / 2, rainTop, rainW, rainBottom - rainTop);
+    ctx.fillRect(rightX + (sectionW - rainW) / 2, rainTop, rainW, rainBottom - rainTop);
+
+    // ── PIXELS (cross-section view) ──
+    drawPixelWell(ctx, refCenterX, refCenterY, refPixelSize, '#4080D0', capturedLeft, '2.5');
+    drawPixelWell(ctx, curCenterX, curCenterY, currentPixelSize, '#ffd94d', capturedRight, px.um.toString());
+
+    // ── PHOTON RAIN ──
+    for (const p of photons) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+
+      let alpha = 0.8;
+      if (p.state === 'captured') {
+        ctx.fillStyle = `rgba(255,217,77,${0.9})`;
+        ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+      } else if (p.state === 'missed') {
+        ctx.fillStyle = `rgba(100,100,100,${Math.max(0, 0.5 - (time - p.hitTime) * 2)})`;
+      } else {
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      }
+      ctx.fill();
+    }
+
+    // ── COUNTERS ──
+    const counterY = h - 40;
+
+    // Left counter
+    ctx.font = `600 20px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#4080D0';
+    ctx.textAlign = 'center';
+    ctx.fillText(capturedLeft.toString(), refCenterX, counterY);
+
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#444';
+    ctx.fillText('photons captured', refCenterX, counterY + 16);
+
+    // Right counter
+    ctx.font = `600 20px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#ffd94d';
+    ctx.textAlign = 'center';
+    ctx.fillText(capturedRight.toString(), curCenterX, counterY);
+
+    ctx.font = `400 9px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#444';
+    ctx.fillText('photons captured', curCenterX, counterY + 16);
+
+    // Ratio
+    if (capturedLeft > 0 && capturedRight > 0) {
+      const ratio = capturedRight / capturedLeft;
+      ctx.font = `600 12px "JetBrains Mono", monospace`;
+      ctx.fillStyle = ratio > 1 ? '#40B060' : '#D94040';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${ratio.toFixed(1)}x`, w / 2, counterY - 20);
+      ctx.font = `400 8px "JetBrains Mono", monospace`;
+      ctx.fillStyle = '#555';
+      ctx.fillText('ratio', w / 2, counterY - 8);
+    }
+
+    // Divider
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(w / 2, 50);
+    ctx.lineTo(w / 2, h - 60);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.font = `400 8px "JetBrains Mono", monospace`;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.textAlign = 'center';
+    ctx.fillText('VS', w / 2, h * 0.5);
+
+    updateCards();
+  }
+
+  function drawPixelWell(ctx, cx, cy, size, color, count, label) {
+    const halfSize = size / 2;
+
+    // Well shape (bucket cross-section)
+    ctx.beginPath();
+    ctx.moveTo(cx - halfSize - 6, cy - halfSize);
+    ctx.lineTo(cx - halfSize, cy + halfSize);
+    ctx.lineTo(cx + halfSize, cy + halfSize);
+    ctx.lineTo(cx + halfSize + 6, cy - halfSize);
+    ctx.closePath();
+
+    // Fill based on how full
+    const fillLevel = Math.min(count / 50, 1);
+    const fillH = size * fillLevel;
+
+    ctx.save();
+    ctx.clip();
+
+    // Background
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(cx - halfSize - 10, cy - halfSize - 2, size + 20, size + 4);
+
+    // Fill
+    if (fillLevel > 0) {
+      const grad = ctx.createLinearGradient(cx, cy + halfSize, cx, cy + halfSize - fillH);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, `${color}44`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(cx - halfSize - 10, cy + halfSize - fillH, size + 20, fillH);
+    }
+
+    ctx.restore();
+
+    // Well outline
+    ctx.beginPath();
+    ctx.moveTo(cx - halfSize - 6, cy - halfSize);
+    ctx.lineTo(cx - halfSize, cy + halfSize);
+    ctx.lineTo(cx + halfSize, cy + halfSize);
+    ctx.lineTo(cx + halfSize + 6, cy - halfSize);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Walls (thicker)
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#333';
+    // Left wall
+    ctx.beginPath();
+    ctx.moveTo(cx - halfSize - 8, cy - halfSize - 4);
+    ctx.lineTo(cx - halfSize - 6, cy - halfSize);
+    ctx.lineTo(cx - halfSize, cy + halfSize);
+    ctx.lineTo(cx - halfSize - 2, cy + halfSize + 4);
+    ctx.stroke();
+    // Right wall
+    ctx.beginPath();
+    ctx.moveTo(cx + halfSize + 8, cy - halfSize - 4);
+    ctx.lineTo(cx + halfSize + 6, cy - halfSize);
+    ctx.lineTo(cx + halfSize, cy + halfSize);
+    ctx.lineTo(cx + halfSize + 2, cy + halfSize + 4);
+    ctx.stroke();
+
+    // Opening width label
+    ctx.font = `500 8px "JetBrains Mono", monospace`;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+
+    // Top bracket
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.5;
+    const bracketY = cy - halfSize - 12;
+    ctx.beginPath();
+    ctx.moveTo(cx - halfSize - 6, bracketY + 4);
+    ctx.lineTo(cx - halfSize - 6, bracketY);
+    ctx.lineTo(cx + halfSize + 6, bracketY);
+    ctx.lineTo(cx + halfSize + 6, bracketY + 4);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.fillText(`${label} \u00B5m`, cx, bracketY - 4);
+  }
+
+  // ── PHYSICS ──
+  let spawnAccum = 0;
+
+  function stepPhotons(dt) {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    const px = PX_STEPS[currentPxIdx];
+    const rate = LIGHT_RATES[lightLevel];
+
+    const margin = 40;
+    const sectionW = (w - margin * 3) / 2;
+    const leftX = margin;
+    const rightX = margin * 2 + sectionW;
+
+    const maxVisualSize = Math.min(sectionW * 0.6, h * 0.35);
+    const refPixelSize = maxVisualSize * (2.5 / 11.6);
+    const currentPixelSize = maxVisualSize * (px.um / 11.6);
+
+    const refCenterX = leftX + sectionW / 2;
+    const curCenterX = rightX + sectionW / 2;
+    const pixelY = h * 0.55;
+
+    // Spawn photons
+    spawnAccum += rate * dt;
+    while (spawnAccum >= 1) {
+      spawnAccum -= 1;
+      const rainW = sectionW * 0.8;
+
+      // Left side photon
+      photons.push({
+        x: leftX + (sectionW - rainW) / 2 + Math.random() * rainW,
+        y: 45 + Math.random() * 10,
+        vy: 200 + Math.random() * 80,
+        side: 'left',
+        state: 'falling',
+        hitTime: 0,
+      });
+
+      // Right side photon
+      photons.push({
+        x: rightX + (sectionW - rainW) / 2 + Math.random() * rainW,
+        y: 45 + Math.random() * 10,
+        vy: 200 + Math.random() * 80,
+        side: 'right',
+        state: 'falling',
+        hitTime: 0,
+      });
+    }
+
+    // Cap photon array to prevent memory leak
+    if (photons.length > MAX_PHOTONS) {
+      photons.splice(0, photons.length - MAX_PHOTONS);
+    }
+
+    // Update photons
+    for (let i = photons.length - 1; i >= 0; i--) {
+      const p = photons[i];
+
+      if (p.state === 'falling') {
+        p.y += p.vy * dt;
+
+        const hitY = pixelY - maxVisualSize / 2;
+
+        if (p.y >= hitY) {
+          p.hitTime = time;
+
+          if (p.side === 'left') {
+            // Check if within pixel opening
+            const halfOpen = (refPixelSize / 2) + 6;
+            if (Math.abs(p.x - refCenterX) < halfOpen) {
+              p.state = 'captured';
+              capturedLeft++;
+              p.y = hitY;
+            } else {
+              p.state = 'missed';
+              missedLeft++;
+            }
+          } else {
+            const halfOpen = (currentPixelSize / 2) + 6;
+            if (Math.abs(p.x - curCenterX) < halfOpen) {
+              p.state = 'captured';
+              capturedRight++;
+              p.y = hitY;
+            } else {
+              p.state = 'missed';
+              missedRight++;
+            }
+          }
+        }
+      }
+
+      // Remove old photons
+      if (p.state === 'captured' && time - p.hitTime > 0.3) {
+        photons.splice(i, 1);
+      } else if (p.state === 'missed' && time - p.hitTime > 0.5) {
+        photons.splice(i, 1);
+      } else if (p.y > h + 20) {
+        photons.splice(i, 1);
+      }
+    }
+  }
+
+  function updateCards() {
+    const px = PX_STEPS[currentPxIdx];
+    const area = px.um * px.um;
+    const relSens = area / REF_AREA;
+
+    document.getElementById('cardArea').innerHTML = `${area.toFixed(1)} &micro;m&sup2;`;
+    document.getElementById('cardSens').textContent = `${relSens.toFixed(1)}x`;
+    document.getElementById('cardPhotons').textContent = capturedRight > 0 ? capturedRight.toString() : '--';
+
+    let snr = '--';
+    if (capturedRight > 5) {
+      const snrVal = Math.sqrt(capturedRight);
+      snr = snrVal.toFixed(1);
+    }
+    document.getElementById('cardSNR').textContent = snr;
+  }
+
+  // ── ANIMATION ──
+  function animate(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+
+    if (playing) {
+      time += dt;
+      stepPhotons(dt);
+    }
+
+    draw();
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastTime = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    playing = false;
+    document.getElementById('btnPlay').textContent = 'Play';
+    resetPhotons();
+    time = 0;
+  });
+
+  const pxSlider = document.getElementById('pxSlider');
+  pxSlider.addEventListener('input', () => {
+    setPx(parseInt(pxSlider.value));
+  });
+
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      setPx(idx);
+      pxSlider.value = idx;
+    });
+  });
+
+  function setPx(idx) {
+    currentPxIdx = idx;
+    const px = PX_STEPS[idx];
+    document.getElementById('pxValue').innerHTML = `${px.um} <span class="px-unit">&micro;m</span>`;
+
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+    const ap = document.querySelector(`.preset[data-idx="${idx}"]`);
+    if (ap) ap.classList.add('active');
+
+    resetPhotons();
+    updateCards();
+  }
+
+  document.querySelectorAll('#lightToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#lightToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      lightLevel = chip.dataset.light;
+      resetPhotons();
+    });
+  });
+
+  // ── INIT ──
+  resize();
+  updateCards();
+  draw();
+  window.addEventListener('resize', () => { resize(); draw(); });
+})();
+</script>
+</body>
+</html>

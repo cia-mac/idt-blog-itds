@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-007: Sensor Readout Modes</title>
+<meta property="og:title" content="ITD-007: Sensor Readout Modes">
+<meta property="og:description" content="How pixel data leaves the sensor.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #E8B600;
+    --gold-dim: rgba(232,182,0,0.5);
+    --gold-glow: rgba(232,182,0,0.12);
+    --gold-faint: rgba(232,182,0,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --green: #22c55e;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #f0d060);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin-right: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+
+  .subtitle {
+    font-size: 0.92em;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 20px 0;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+  .panel:nth-of-type(3) { animation-delay: 0.6s; }
+  .panel:nth-of-type(4) { animation-delay: 0.7s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  /* ── CANVAS ── */
+  #sensorCanvas {
+    width: 100%;
+    height: 400px;
+    display: block;
+    border-radius: var(--radius-sm);
+    cursor: default;
+  }
+
+  /* ── TOGGLE CHIPS ── */
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .toggle-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-right: 10px;
+    align-self: center;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 7px 16px;
+    cursor: pointer;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: none;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .chip:hover { background: var(--surface); color: var(--text); transform: translateY(-1px); }
+  .chip.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+  .chip.active-blue { background: #4080D0; color: #fff; font-weight: 600; }
+
+  /* ── FIREFOX SLIDER ── */
+  input[type="range"]::-moz-range-track { background: var(--border-hover); height: 4px; border: none; border-radius: 2px; }
+  input[type="range"]::-moz-range-thumb { background: var(--gold); border: none; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; }
+
+  /* ── READOUT CARDS ── */
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .readout-card:hover { transform: translateY(-2px); border-color: var(--border-hover); }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: var(--text);
+    min-height: 20px;
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-primary { background: var(--gold); color: var(--bg); }
+  .btn-secondary { background: var(--surface-raised); color: var(--text-dim); }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-dim);
+  }
+  .speed-ctrl input[type="range"] {
+    width: 80px;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--gold);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* ── TIMING DIAGRAM ── */
+  #timingCanvas {
+    width: 100%;
+    height: 140px;
+    display: block;
+    border-radius: var(--radius-sm);
+    margin-top: 16px;
+  }
+
+  /* ── NOTE ── */
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(232,182,0,0.2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p {
+    font-size: 0.88em;
+    color: var(--text);
+    line-height: 1.65;
+  }
+  .note strong { color: #fff; }
+
+  /* ── SPECS STRIP ── */
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .spec-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+  }
+  .itd-footer a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .itd-footer a:hover { color: #f0d060; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #sensorCanvas { height: 300px; }
+    #timingCanvas { height: 100px; }
+    .toggle-row { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-007 / Interactive Technical Diagram</div>
+  <h1>Sensor Readout Modes</h1>
+  <div class="subtitle">How pixel data leaves the sensor.</div>
+
+  <!-- MAIN SENSOR GRID -->
+  <div class="panel">
+    <div class="panel-label">Pixel Grid Readout</div>
+    <canvas id="sensorCanvas"></canvas>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnPlay">Play</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+      <div class="speed-ctrl">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1">
+        <span class="speed-val" id="speedVal">1.0x</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODE TOGGLES -->
+  <div class="panel">
+    <div class="panel-label">Readout Configuration</div>
+    <div class="toggle-row">
+      <span class="toggle-group-label">Shutter</span>
+      <div class="toggle-group" id="shutterToggle">
+        <button class="chip active" data-mode="rolling">Rolling</button>
+        <button class="chip" data-mode="global">Global</button>
+      </div>
+
+      <span class="toggle-group-label" style="margin-left: 16px;">Illumination</span>
+      <div class="toggle-group" id="sensorToggle">
+        <button class="chip active" data-mode="fsi">FSI</button>
+        <button class="chip" data-mode="bsi">BSI</button>
+      </div>
+    </div>
+
+    <!-- READOUT CARDS -->
+    <div class="readout-grid" id="readoutGrid">
+      <div class="readout-card">
+        <div class="readout-card-label">Shutter Type</div>
+        <div class="readout-card-value" id="cardShutter">Rolling</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Illumination</div>
+        <div class="readout-card-value" id="cardSensor">Front-Side (FSI)</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Motion Artifact</div>
+        <div class="readout-card-value" id="cardArtifact">Skew / Wobble</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Light Efficiency</div>
+        <div class="readout-card-value" id="cardEfficiency">~50%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIMING DIAGRAM -->
+  <div class="panel">
+    <div class="panel-label">Frame Timing Comparison</div>
+    <canvas id="timingCanvas"></canvas>
+  </div>
+
+  <!-- NOTE -->
+  <div class="note">
+    <p><strong>Rolling shutter</strong> reads pixel rows sequentially, top to bottom. Fast-moving subjects appear skewed because the top and bottom of the frame are captured at different moments. <strong>Global shutter</strong> exposes and reads all pixels simultaneously, eliminating motion artifacts but requiring more complex (and typically noisier) circuitry. <strong>BSI</strong> (back-side illuminated) sensors flip the silicon so light hits the photodiode directly, improving quantum efficiency by 40-90% over <strong>FSI</strong> (front-side illuminated) designs.</p>
+  </div>
+
+  <!-- SPECS -->
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-007</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Sensor Architecture</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Toggle + Animate</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Author</span>
+      <span class="spec-value">ciamac.com</span>
+    </div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-007 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── STATE ──
+  let shutterMode = 'rolling'; // rolling | global
+  let sensorMode = 'fsi';      // fsi | bsi
+  let playing = false;
+  let speed = 1;
+  let progress = 0; // 0..1 per frame cycle
+  let animId = null;
+  let lastTime = 0;
+  let dpr = window.devicePixelRatio || 1;
+
+  // ── GRID CONFIG ──
+  const COLS = 24;
+  const ROWS = 16;
+  const PADDING = 28;
+
+  // ── COLORS ──
+  const COL_GOLD = '#E8B600';
+  const COL_BLUE = '#4080D0';
+  const COL_BG = '#0c0c0c';
+  const COL_PANEL = '#111';
+  const COL_DARK = '#181818';
+  const COL_DIM = '#222';
+  const COL_READ = '#E8B600';
+  const COL_EXPOSE = '#4080D0';
+  const COL_EXPOSE_BSI = '#40B060';
+  const COL_IDLE = '#1a1a1a';
+
+  // ── CANVAS SETUP ──
+  const sensorCanvas = document.getElementById('sensorCanvas');
+  const sCtx = sensorCanvas.getContext('2d');
+  const timingCanvas = document.getElementById('timingCanvas');
+  const tCtx = timingCanvas.getContext('2d');
+
+  function resizeCanvases() {
+    dpr = window.devicePixelRatio || 1;
+    for (const [cvs, ctx] of [[sensorCanvas, sCtx], [timingCanvas, tCtx]]) {
+      const rect = cvs.getBoundingClientRect();
+      cvs.width = rect.width * dpr;
+      cvs.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
+
+  // ── SENSOR GRID DRAWING ──
+  function drawSensorGrid() {
+    const w = sensorCanvas.getBoundingClientRect().width;
+    const h = sensorCanvas.getBoundingClientRect().height;
+    sCtx.clearRect(0, 0, w, h);
+
+    const gridW = w - PADDING * 2;
+    const gridH = h - PADDING * 2 - 30; // leave room for labels
+    const cellW = gridW / COLS;
+    const cellH = gridH / ROWS;
+    const gap = 1.5;
+    const startX = PADDING;
+    const startY = PADDING + 20;
+
+    const exposeColor = sensorMode === 'bsi' ? COL_EXPOSE_BSI : COL_EXPOSE;
+
+    // Draw title
+    sCtx.font = `500 11px "JetBrains Mono", monospace`;
+    sCtx.fillStyle = '#444';
+    sCtx.textAlign = 'left';
+    sCtx.fillText(`${COLS} x ${ROWS} pixel grid`, startX, startY - 8);
+
+    // Frame progress label
+    sCtx.textAlign = 'right';
+    sCtx.fillStyle = COL_GOLD;
+    sCtx.fillText(`Frame: ${Math.floor(progress * 100)}%`, w - PADDING, startY - 8);
+
+    if (shutterMode === 'rolling') {
+      drawRollingShutter(startX, startY, cellW, cellH, gap, exposeColor);
+    } else {
+      drawGlobalShutter(startX, startY, cellW, cellH, gap, exposeColor);
+    }
+
+    // Draw row indicators for rolling shutter
+    if (shutterMode === 'rolling') {
+      drawRollingIndicators(startX, startY, cellH, gridW, gridH);
+    }
+
+    // Legend
+    const legY = startY + gridH + 18;
+    const legItems = [
+      { color: COL_IDLE, label: 'Idle' },
+      { color: exposeColor, label: 'Exposing' },
+      { color: COL_READ, label: 'Reading Out' },
+    ];
+    sCtx.font = `400 10px "JetBrains Mono", monospace`;
+    sCtx.textAlign = 'left';
+    let legX = startX;
+    for (const item of legItems) {
+      sCtx.fillStyle = item.color;
+      sCtx.fillRect(legX, legY - 6, 10, 10);
+      sCtx.fillStyle = '#666';
+      sCtx.fillText(item.label, legX + 14, legY + 3);
+      legX += sCtx.measureText(item.label).width + 30;
+    }
+  }
+
+  function drawRollingShutter(sx, sy, cw, ch, gap, expColor) {
+    // Rolling: rows expose and read sequentially with overlap
+    // Each row has: expose phase, then read phase
+    // The "wave" moves down the sensor
+    const readBand = 0.08;   // fraction of frame to read one row
+    const exposeFrac = 0.25; // exposure duration as fraction of frame
+
+    for (let r = 0; r < ROWS; r++) {
+      const rowStart = (r / ROWS) * (1 - exposeFrac - readBand);
+      const exposeStart = rowStart;
+      const exposeEnd = rowStart + exposeFrac;
+      const readStart = exposeEnd;
+      const readEnd = readStart + readBand;
+
+      for (let c = 0; c < COLS; c++) {
+        const x = sx + c * cw + gap / 2;
+        const y = sy + r * ch + gap / 2;
+
+        let color = COL_IDLE;
+        let alpha = 1;
+
+        if (progress >= exposeStart && progress < exposeEnd) {
+          color = expColor;
+          // Brightness ramps up during exposure
+          alpha = 0.4 + 0.6 * ((progress - exposeStart) / exposeFrac);
+        } else if (progress >= readStart && progress < readEnd) {
+          color = COL_READ;
+          // Read sweeps left to right across columns
+          const readProgress = (progress - readStart) / readBand;
+          const readCol = Math.floor(readProgress * COLS);
+          if (c <= readCol) {
+            alpha = 1;
+          } else {
+            color = expColor;
+            alpha = 0.3;
+          }
+        } else if (progress >= readEnd) {
+          color = COL_IDLE;
+          alpha = 0.5;
+        }
+
+        sCtx.globalAlpha = alpha;
+        sCtx.fillStyle = color;
+        roundRect(sCtx, x, y, cw - gap, ch - gap, 2);
+        sCtx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawRollingIndicators(sx, sy, ch, gridW, gridH) {
+    const readBand = 0.08;
+    const exposeFrac = 0.25;
+
+    // Draw expose band marker
+    sCtx.strokeStyle = COL_EXPOSE;
+    sCtx.lineWidth = 1.5;
+    sCtx.setLineDash([4, 3]);
+
+    // Find the row range currently exposing
+    let expTopRow = -1, expBotRow = -1;
+    let readRow = -1;
+
+    for (let r = 0; r < ROWS; r++) {
+      const rowStart = (r / ROWS) * (1 - exposeFrac - readBand);
+      const exposeEnd = rowStart + exposeFrac;
+      const readStart = exposeEnd;
+      const readEnd = readStart + readBand;
+
+      if (progress >= rowStart && progress < exposeEnd) {
+        if (expTopRow === -1) expTopRow = r;
+        expBotRow = r;
+      }
+      if (progress >= readStart && progress < readEnd) {
+        readRow = r;
+      }
+    }
+
+    // Expose bracket
+    if (expTopRow >= 0) {
+      const y1 = sy + expTopRow * ch;
+      const y2 = sy + (expBotRow + 1) * ch;
+      sCtx.strokeStyle = sensorMode === 'bsi' ? COL_EXPOSE_BSI : COL_EXPOSE;
+      sCtx.beginPath();
+      sCtx.moveTo(sx + gridW + 6, y1);
+      sCtx.lineTo(sx + gridW + 12, y1);
+      sCtx.lineTo(sx + gridW + 12, y2);
+      sCtx.lineTo(sx + gridW + 6, y2);
+      sCtx.stroke();
+
+      sCtx.setLineDash([]);
+      sCtx.font = `500 9px "JetBrains Mono", monospace`;
+      sCtx.fillStyle = sensorMode === 'bsi' ? COL_EXPOSE_BSI : COL_EXPOSE;
+      sCtx.textAlign = 'left';
+      sCtx.save();
+      sCtx.translate(sx + gridW + 20, (y1 + y2) / 2);
+      sCtx.rotate(-Math.PI / 2);
+      sCtx.fillText('EXPOSE', 0, 0);
+      sCtx.restore();
+    }
+
+    // Read indicator
+    if (readRow >= 0) {
+      const ry = sy + readRow * ch + ch / 2;
+      sCtx.setLineDash([]);
+      sCtx.strokeStyle = COL_READ;
+      sCtx.lineWidth = 2;
+      sCtx.beginPath();
+      sCtx.moveTo(sx - 14, ry);
+      sCtx.lineTo(sx - 4, ry);
+      sCtx.stroke();
+
+      // Arrow
+      sCtx.fillStyle = COL_READ;
+      sCtx.beginPath();
+      sCtx.moveTo(sx - 4, ry - 4);
+      sCtx.lineTo(sx - 4, ry + 4);
+      sCtx.lineTo(sx + 2, ry);
+      sCtx.closePath();
+      sCtx.fill();
+
+      sCtx.font = `500 9px "JetBrains Mono", monospace`;
+      sCtx.fillStyle = COL_READ;
+      sCtx.textAlign = 'right';
+      sCtx.fillText('READ', sx - 18, ry + 3);
+    }
+
+    sCtx.setLineDash([]);
+  }
+
+  function drawGlobalShutter(sx, sy, cw, ch, gap, expColor) {
+    // Global: all pixels expose simultaneously, then all read simultaneously
+    const exposeFrac = 0.45;
+    const readStart = exposeFrac + 0.05;
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = sx + c * cw + gap / 2;
+        const y = sy + r * ch + gap / 2;
+
+        let color = COL_IDLE;
+        let alpha = 1;
+
+        if (progress < exposeFrac) {
+          // All exposing together
+          color = expColor;
+          alpha = 0.3 + 0.7 * (progress / exposeFrac);
+        } else if (progress >= readStart && progress < 1) {
+          // Read out row by row, left to right
+          const readProgress = (progress - readStart) / (1 - readStart);
+          const totalPixels = ROWS * COLS;
+          const pixelsDone = Math.floor(readProgress * totalPixels);
+          const thisPixel = r * COLS + c;
+
+          if (thisPixel < pixelsDone) {
+            color = COL_READ;
+            alpha = 1;
+          } else {
+            // Waiting to be read (still holds charge)
+            color = expColor;
+            alpha = 0.35;
+          }
+        } else {
+          // Gap between expose and read
+          color = expColor;
+          alpha = 0.2;
+        }
+
+        sCtx.globalAlpha = alpha;
+        sCtx.fillStyle = color;
+        roundRect(sCtx, x, y, cw - gap, ch - gap, 2);
+        sCtx.globalAlpha = 1;
+      }
+    }
+
+    // Labels for global shutter
+    const gridH = ch * ROWS;
+    if (progress < exposeFrac) {
+      sCtx.font = `600 13px "JetBrains Mono", monospace`;
+      sCtx.fillStyle = sensorMode === 'bsi' ? COL_EXPOSE_BSI : COL_EXPOSE;
+      sCtx.textAlign = 'center';
+      sCtx.fillText('ALL PIXELS EXPOSING', sx + (cw * COLS) / 2, sy + gridH / 2 + 5);
+    } else if (progress >= readStart) {
+      sCtx.font = `600 13px "JetBrains Mono", monospace`;
+      sCtx.fillStyle = COL_READ;
+      sCtx.textAlign = 'center';
+      sCtx.fillText('SEQUENTIAL READOUT', sx + (cw * COLS) / 2, sy + gridH / 2 + 5);
+    }
+  }
+
+  // ── TIMING DIAGRAM ──
+  function drawTimingDiagram() {
+    const w = timingCanvas.getBoundingClientRect().width;
+    const h = timingCanvas.getBoundingClientRect().height;
+    tCtx.clearRect(0, 0, w, h);
+
+    const margin = { left: 60, right: 20, top: 14, bottom: 20 };
+    const plotW = w - margin.left - margin.right;
+    const plotH = h - margin.top - margin.bottom;
+
+    const expColor = sensorMode === 'bsi' ? COL_EXPOSE_BSI : COL_EXPOSE;
+
+    // Axis
+    tCtx.strokeStyle = '#2a2a2a';
+    tCtx.lineWidth = 1;
+    tCtx.beginPath();
+    tCtx.moveTo(margin.left, margin.top);
+    tCtx.lineTo(margin.left, margin.top + plotH);
+    tCtx.lineTo(margin.left + plotW, margin.top + plotH);
+    tCtx.stroke();
+
+    // Time label
+    tCtx.font = `400 9px "JetBrains Mono", monospace`;
+    tCtx.fillStyle = '#444';
+    tCtx.textAlign = 'center';
+    tCtx.fillText('Time →', margin.left + plotW / 2, h - 4);
+
+    // Row labels
+    tCtx.textAlign = 'right';
+    const dispRows = 6; // Show 6 representative rows
+    const rowStep = Math.floor(ROWS / dispRows);
+    const barH = (plotH - 4) / dispRows - 3;
+
+    if (shutterMode === 'rolling') {
+      const readBand = 0.08;
+      const exposeFrac = 0.25;
+
+      tCtx.fillStyle = '#333';
+      tCtx.textAlign = 'left';
+      tCtx.font = `500 9px "JetBrains Mono", monospace`;
+      tCtx.fillText('Rolling Shutter', margin.left + 4, margin.top + 10);
+
+      for (let i = 0; i < dispRows; i++) {
+        const r = i * rowStep;
+        const y = margin.top + i * (barH + 3) + 16;
+        const rowStart = (r / ROWS) * (1 - exposeFrac - readBand);
+        const expStart = rowStart;
+        const expEnd = rowStart + exposeFrac;
+        const rdStart = expEnd;
+        const rdEnd = rdStart + readBand;
+
+        // Row label
+        tCtx.font = `400 8px "JetBrains Mono", monospace`;
+        tCtx.fillStyle = '#555';
+        tCtx.textAlign = 'right';
+        tCtx.fillText(`Row ${r}`, margin.left - 6, y + barH / 2 + 3);
+
+        // Expose bar
+        const exX = margin.left + expStart * plotW;
+        const exW = (expEnd - expStart) * plotW;
+        tCtx.fillStyle = expColor;
+        tCtx.globalAlpha = 0.6;
+        roundRect(tCtx, exX, y, exW, barH, 2);
+
+        // Read bar
+        const rdX = margin.left + rdStart * plotW;
+        const rdW = (rdEnd - rdStart) * plotW;
+        tCtx.fillStyle = COL_READ;
+        tCtx.globalAlpha = 0.8;
+        roundRect(tCtx, rdX, y, rdW, barH, 2);
+        tCtx.globalAlpha = 1;
+      }
+
+      // Draw skew line showing temporal offset
+      tCtx.strokeStyle = '#D94040';
+      tCtx.lineWidth = 1.5;
+      tCtx.setLineDash([4, 3]);
+      tCtx.beginPath();
+      const firstExpEnd = (0 / ROWS) * (1 - exposeFrac - readBand) + exposeFrac;
+      const lastExpEnd = ((ROWS - 1) / ROWS) * (1 - exposeFrac - readBand) + exposeFrac;
+      tCtx.moveTo(margin.left + firstExpEnd * plotW, margin.top + 16);
+      tCtx.lineTo(margin.left + lastExpEnd * plotW, margin.top + (dispRows - 1) * (barH + 3) + 16 + barH);
+      tCtx.stroke();
+      tCtx.setLineDash([]);
+
+      // Skew label
+      tCtx.font = `500 8px "JetBrains Mono", monospace`;
+      tCtx.fillStyle = '#D94040';
+      tCtx.textAlign = 'left';
+      tCtx.fillText('← temporal skew', margin.left + lastExpEnd * plotW + 6, margin.top + plotH / 2);
+
+    } else {
+      // Global shutter timing
+      const exposeFrac = 0.45;
+      const readStart = 0.50;
+
+      tCtx.fillStyle = '#333';
+      tCtx.textAlign = 'left';
+      tCtx.font = `500 9px "JetBrains Mono", monospace`;
+      tCtx.fillText('Global Shutter', margin.left + 4, margin.top + 10);
+
+      for (let i = 0; i < dispRows; i++) {
+        const r = i * rowStep;
+        const y = margin.top + i * (barH + 3) + 16;
+        const rdRowStart = readStart + (r / ROWS) * (1 - readStart);
+        const rdRowEnd = rdRowStart + (1 - readStart) / ROWS;
+
+        // Row label
+        tCtx.font = `400 8px "JetBrains Mono", monospace`;
+        tCtx.fillStyle = '#555';
+        tCtx.textAlign = 'right';
+        tCtx.fillText(`Row ${r}`, margin.left - 6, y + barH / 2 + 3);
+
+        // Expose bar (same for all rows)
+        const exX = margin.left;
+        const exW = exposeFrac * plotW;
+        tCtx.fillStyle = expColor;
+        tCtx.globalAlpha = 0.6;
+        roundRect(tCtx, exX, y, exW, barH, 2);
+
+        // Read bar (sequential but all start after expose)
+        const rdX = margin.left + rdRowStart * plotW;
+        const rdW = (rdRowEnd - rdRowStart) * plotW;
+        tCtx.fillStyle = COL_READ;
+        tCtx.globalAlpha = 0.8;
+        roundRect(tCtx, rdX, y, Math.max(rdW, 3), barH, 2);
+        tCtx.globalAlpha = 1;
+      }
+
+      // Alignment line (vertical, showing simultaneous exposure end)
+      tCtx.strokeStyle = '#40B060';
+      tCtx.lineWidth = 1.5;
+      tCtx.setLineDash([4, 3]);
+      tCtx.beginPath();
+      const alignX = margin.left + exposeFrac * plotW;
+      tCtx.moveTo(alignX, margin.top + 16);
+      tCtx.lineTo(alignX, margin.top + (dispRows - 1) * (barH + 3) + 16 + barH);
+      tCtx.stroke();
+      tCtx.setLineDash([]);
+
+      tCtx.font = `500 8px "JetBrains Mono", monospace`;
+      tCtx.fillStyle = '#40B060';
+      tCtx.textAlign = 'left';
+      tCtx.fillText('← all rows aligned', margin.left + exposeFrac * plotW + 6, margin.top + plotH / 2);
+    }
+
+    // Progress marker
+    if (playing || progress > 0) {
+      const px = margin.left + progress * plotW;
+      tCtx.strokeStyle = COL_GOLD;
+      tCtx.lineWidth = 1.5;
+      tCtx.setLineDash([]);
+      tCtx.beginPath();
+      tCtx.moveTo(px, margin.top + 12);
+      tCtx.lineTo(px, margin.top + plotH);
+      tCtx.stroke();
+
+      // Triangle marker at top
+      tCtx.fillStyle = COL_GOLD;
+      tCtx.beginPath();
+      tCtx.moveTo(px - 4, margin.top + 12);
+      tCtx.lineTo(px + 4, margin.top + 12);
+      tCtx.lineTo(px, margin.top + 17);
+      tCtx.closePath();
+      tCtx.fill();
+    }
+  }
+
+  // ── HELPERS ──
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── ANIMATION LOOP ──
+  function animate(time) {
+    if (!lastTime) lastTime = time;
+    const dt = (time - lastTime) / 1000;
+    lastTime = time;
+
+    if (playing) {
+      progress += dt * speed * 0.5; // one cycle ~ 2s at 1x
+      if (progress >= 1) {
+        progress = 0; // loop
+      }
+    }
+
+    drawSensorGrid();
+    drawTimingDiagram();
+    animId = requestAnimationFrame(animate);
+  }
+
+  // ── INTERSECTION OBSERVER ──
+  const visibleCanvases = new Set();
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        visibleCanvases.add(e.target);
+      } else {
+        visibleCanvases.delete(e.target);
+      }
+    });
+    if (visibleCanvases.size > 0) {
+      if (!animId) {
+        lastTime = 0;
+        animId = requestAnimationFrame(animate);
+      }
+    } else {
+      if (animId) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    }
+  }, { threshold: 0.1 });
+  observer.observe(sensorCanvas);
+  observer.observe(timingCanvas);
+
+  // ── CONTROLS ──
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    playing = false;
+    progress = 0;
+    document.getElementById('btnPlay').textContent = 'Play';
+    drawSensorGrid();
+    drawTimingDiagram();
+  });
+
+  document.getElementById('speedSlider').addEventListener('input', (e) => {
+    speed = parseFloat(e.target.value);
+    document.getElementById('speedVal').textContent = speed.toFixed(1) + 'x';
+  });
+
+  // Shutter toggle
+  document.querySelectorAll('#shutterToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#shutterToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      shutterMode = chip.dataset.mode;
+      progress = 0;
+      updateCards();
+    });
+  });
+
+  // Sensor toggle
+  document.querySelectorAll('#sensorToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#sensorToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      sensorMode = chip.dataset.mode;
+      updateCards();
+    });
+  });
+
+  function updateCards() {
+    const isRolling = shutterMode === 'rolling';
+    const isBSI = sensorMode === 'bsi';
+
+    document.getElementById('cardShutter').textContent = isRolling ? 'Rolling' : 'Global';
+    document.getElementById('cardSensor').textContent = isBSI ? 'Back-Side (BSI)' : 'Front-Side (FSI)';
+    document.getElementById('cardArtifact').textContent = isRolling ? 'Skew / Wobble' : 'None';
+    document.getElementById('cardEfficiency').textContent = isBSI ? '~80-95%' : '~50%';
+  }
+
+  // ── INIT ──
+  function init() {
+    resizeCanvases();
+    drawSensorGrid();
+    drawTimingDiagram();
+  }
+
+  window.addEventListener('resize', () => {
+    resizeCanvases();
+    drawSensorGrid();
+    drawTimingDiagram();
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>

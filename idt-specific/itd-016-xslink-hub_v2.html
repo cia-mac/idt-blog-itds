@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-016: XSLink Hub Bridging</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .subtitle span {
+    color: #E8B600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  #flowCanvas {
+    width: 100%;
+    height: 480px;
+    display: block;
+    border-radius: 8px;
+    touch-action: none;
+  }
+
+  /* ── READOUT CARDS ── */
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: #ccc;
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: #E8B600; }
+  .readout-card-value.blue { color: #4080D0; }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s, background 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #E8B600; color: #0c0c0c; }
+  .btn-secondary { background: #1e1e1e; color: #888; }
+  .btn-add { background: #4080D0; color: #fff; }
+
+  /* ── TOGGLE ── */
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toggle-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+    margin-right: 6px;
+  }
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 7px 16px;
+    cursor: pointer;
+    background: #141414;
+    color: #555;
+    border: none;
+    transition: background 0.2s, color 0.2s;
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .chip:hover { background: #1a1a1a; color: #888; }
+  .chip.active { background: #E8B600; color: #0c0c0c; font-weight: 600; }
+
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .note p {
+    font-size: 0.82em;
+    color: #888;
+    line-height: 1.65;
+  }
+  .note strong { color: #bbb; }
+
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 14px 0;
+    border-top: 1px solid #1a1a1a;
+    margin-top: 20px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 2px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #E8B600;
+  }
+
+  /* ── FIREFOX RANGE SLIDER ── */
+  input[type="range"]::-moz-range-track {
+    background: #333;
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: #E8B600;
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #flowCanvas { height: 400px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>XSLink Hub Bridging</h1>
+  <div class="subtitle">Two USB-C cameras. One fiber port. Zero data loss. <span>ITD-016</span></div>
+
+  <div class="panel">
+    <div class="panel-label">Data Flow Topology</div>
+    <canvas id="flowCanvas"></canvas>
+
+    <div class="controls">
+      <button class="btn btn-add" id="btnAddCam">+ Camera</button>
+      <button class="btn btn-secondary" id="btnRemoveCam">- Camera</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Processor</div>
+    <div class="toggle-row">
+      <span class="toggle-group-label">System</span>
+      <div class="toggle-group" id="procToggle">
+        <button class="chip" data-proc="rt3">RT III</button>
+        <button class="chip active" data-proc="rt4">RT IV</button>
+        <button class="chip" data-proc="rtv">RT V</button>
+      </div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Processor</div>
+        <div class="readout-card-value gold" id="cardProc">RT IV</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Fiber Ports</div>
+        <div class="readout-card-value" id="cardPorts">2</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Max Hubs</div>
+        <div class="readout-card-value" id="cardHubs">2</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Max Cameras</div>
+        <div class="readout-card-value blue" id="cardMaxCam">4 via hub</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p>The <strong>XSLink Hub</strong> aggregates two USB-C camera streams into a single QSFP fiber connection. This allows compact cameras like the <strong>XSM</strong> (200g) and <strong>OS II</strong> (400g) to connect to rack-mount processors over long fiber runs. Each hub occupies one fiber port on the processor. An RT IV with 2 fiber ports supports 2 hubs, giving access to 4 USB-C cameras. An RT V with 4 ports supports up to 8 cameras through 4 hubs. Cameras connected through a hub run at half the maximum frame rate of a direct connection.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-016</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Hub Bridging</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Build + Animate</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Source</span>
+      <span class="spec-value">idtcameras.com</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── PROCESSOR SPECS ──
+  const PROCESSORS = {
+    rt3: { name: 'RT III Compact', fiberPorts: 1, usbPorts: 2, maxHubs: 1, color: '#40B060' },
+    rt4: { name: 'RT IV Rack', fiberPorts: 2, usbPorts: 0, maxHubs: 2, color: '#4080D0' },
+    rtv: { name: 'RT V', fiberPorts: 4, usbPorts: 0, maxHubs: 4, color: '#E8B600' },
+  };
+
+  // ── STATE ──
+  let currentProc = 'rt4';
+  let cameraCount = 2; // start with 2 cameras (1 hub demo)
+  let animId = null;
+  let lastTime = 0;
+  let time = 0;
+
+  // ── PACKET SYSTEM ──
+  let packets = [];
+  const PACKET_SPEED = 120; // px/s
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('flowCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── LAYOUT CALCULATION ──
+  function getLayout() {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    const proc = PROCESSORS[currentProc];
+    const hubCount = Math.ceil(cameraCount / 2);
+    const maxHubs = proc.maxHubs;
+    const activeHubs = Math.min(hubCount, maxHubs);
+
+    // Processor on the right
+    const procX = w - 140;
+    const procY = h / 2;
+    const procW = 110;
+    const procH = 60 + activeHubs * 30;
+
+    // Hubs in the middle
+    const hubX = w / 2 - 20;
+    const hubSpacing = Math.min(100, (h - 80) / Math.max(activeHubs, 1));
+    const hubStartY = procY - (activeHubs - 1) * hubSpacing / 2;
+
+    // Cameras on the left
+    const camX = 60;
+    const camSpacing = Math.min(80, (h - 60) / Math.max(cameraCount, 1));
+    const camStartY = procY - (cameraCount - 1) * camSpacing / 2;
+
+    return { w, h, procX, procY, procW, procH, hubX, hubSpacing, hubStartY, camX, camSpacing, camStartY, activeHubs, proc };
+  }
+
+  // ── DRAW ──
+  function draw() {
+    const L = getLayout();
+    ctx.clearRect(0, 0, L.w, L.h);
+
+    const proc = L.proc;
+    const overCapacity = cameraCount > L.activeHubs * 2;
+
+    // ── CABLES (draw first, behind everything) ──
+    // Camera to Hub cables (USB-C)
+    let camIdx = 0;
+    for (let hi = 0; hi < L.activeHubs; hi++) {
+      const hy = L.hubStartY + hi * L.hubSpacing;
+      for (let ci = 0; ci < 2 && camIdx < cameraCount; ci++) {
+        const cy = L.camStartY + camIdx * L.camSpacing;
+        drawCable(L.camX + 40, cy, L.hubX - 30, hy, '#4080D0', 0.25, camIdx);
+        camIdx++;
+      }
+    }
+    // Overflow cameras (no hub)
+    while (camIdx < cameraCount) {
+      const cy = L.camStartY + camIdx * L.camSpacing;
+      drawCable(L.camX + 40, cy, L.hubX - 30, cy, '#D94040', 0.12, -1);
+      camIdx++;
+    }
+
+    // Hub to Processor cables (Fiber)
+    for (let hi = 0; hi < L.activeHubs; hi++) {
+      const hy = L.hubStartY + hi * L.hubSpacing;
+      const portY = L.procY - (L.activeHubs - 1) * 14 / 2 + hi * 14;
+      drawCable(L.hubX + 30, hy, L.procX - 10, portY, '#E8B600', 0.3, -1);
+    }
+
+    // ── CAMERAS ──
+    camIdx = 0;
+    for (let i = 0; i < cameraCount; i++) {
+      const cy = L.camStartY + i * L.camSpacing;
+      const isOverflow = i >= L.activeHubs * 2;
+      drawCamera(L.camX, cy, i, isOverflow);
+    }
+
+    // ── HUBS ──
+    for (let hi = 0; hi < L.activeHubs; hi++) {
+      const hy = L.hubStartY + hi * L.hubSpacing;
+      const camCount = Math.min(2, cameraCount - hi * 2);
+      drawHub(L.hubX, hy, hi, camCount);
+    }
+
+    // ── PROCESSOR ──
+    drawProcessor(L.procX, L.procY, proc, L.activeHubs);
+
+    // ── PACKETS ──
+    drawPackets();
+
+    // ── OVERFLOW WARNING ──
+    if (overCapacity) {
+      ctx.font = '500 10px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#D94040';
+      ctx.textAlign = 'center';
+      ctx.fillText('Exceeds hub capacity. Additional cameras need more fiber ports.', L.w / 2, L.h - 12);
+    }
+
+    // ── LABELS ──
+    ctx.font = '400 9px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#2a2a2a';
+    ctx.textAlign = 'center';
+    ctx.fillText('USB-C', (L.camX + 40 + L.hubX - 30) / 2, 18);
+    ctx.fillText('QSFP Fiber', (L.hubX + 30 + L.procX - 10) / 2, 18);
+  }
+
+  function drawCamera(x, y, index, isOverflow) {
+    const w = 36, h = 28;
+    // Body
+    ctx.fillStyle = isOverflow ? '#1a1a1a' : '#1e1e1e';
+    ctx.strokeStyle = isOverflow ? '#D94040' : '#4080D0';
+    ctx.lineWidth = 1.5;
+    roundRectStroke(ctx, x - w/2, y - h/2, w, h, 4);
+
+    // Lens circle
+    ctx.beginPath();
+    ctx.arc(x - 4, y, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = isOverflow ? 'rgba(217,64,64,0.4)' : 'rgba(64,128,208,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Label
+    ctx.font = '600 8px "JetBrains Mono", monospace';
+    ctx.fillStyle = isOverflow ? '#D94040' : '#4080D0';
+    ctx.textAlign = 'center';
+    ctx.fillText(`CAM ${index + 1}`, x, y + h/2 + 12);
+
+    // Type
+    ctx.font = '400 7px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#333';
+    ctx.fillText('USB-C', x, y + h/2 + 22);
+  }
+
+  function drawHub(x, y, index, camCount) {
+    const w = 56, h = 34;
+
+    // Glow (v2: increased alpha from 0.03 to 0.10)
+    ctx.fillStyle = 'rgba(232,182,0,0.10)';
+    ctx.beginPath();
+    ctx.arc(x, y, 40, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = '#161616';
+    ctx.strokeStyle = '#E8B600';
+    ctx.lineWidth = 1.5;
+    roundRectStroke(ctx, x - w/2, y - h/2, w, h, 6);
+
+    // Inner fill
+    ctx.fillStyle = 'rgba(232,182,0,0.04)';
+    roundRectFill(ctx, x - w/2 + 1, y - h/2 + 1, w - 2, h - 2, 5);
+
+    // USB-C port indicators (left side)
+    for (let i = 0; i < 2; i++) {
+      const py = y - 6 + i * 12;
+      ctx.fillStyle = i < camCount ? '#4080D0' : '#1e1e1e';
+      ctx.fillRect(x - w/2 - 3, py - 2, 6, 4);
+    }
+
+    // Fiber port indicator (right side)
+    ctx.fillStyle = '#E8B600';
+    ctx.fillRect(x + w/2 - 3, y - 2, 6, 4);
+
+    // Label
+    ctx.font = '600 7px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#E8B600';
+    ctx.textAlign = 'center';
+    ctx.fillText('XSLink', x, y - 2);
+    ctx.font = '500 6px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#666';
+    ctx.fillText(`${camCount}\u21922\u21921`, x, y + 8);
+
+    // Hub number
+    ctx.font = '400 7px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#444';
+    ctx.fillText(`Hub ${index + 1}`, x, y + h/2 + 12);
+  }
+
+  function drawProcessor(x, y, proc, activeHubs) {
+    const w = 100;
+    const h = 50 + activeHubs * 24;
+
+    // Body
+    ctx.fillStyle = '#141414';
+    ctx.strokeStyle = proc.color;
+    ctx.lineWidth = 2;
+    roundRectStroke(ctx, x - w/2, y - h/2, w, h, 8);
+
+    // Inner fill
+    ctx.fillStyle = 'rgba(232,182,0,0.02)';
+    roundRectFill(ctx, x - w/2 + 1, y - h/2 + 1, w - 2, h - 2, 7);
+
+    // Title
+    ctx.font = '700 10px "JetBrains Mono", monospace';
+    ctx.fillStyle = proc.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(proc.name, x, y - h/2 + 18);
+
+    // Port indicators
+    ctx.font = '400 7px "JetBrains Mono", monospace';
+    for (let i = 0; i < proc.fiberPorts; i++) {
+      const py = y - (proc.fiberPorts - 1) * 10 / 2 + i * 10 + 8;
+      const active = i < activeHubs;
+      ctx.fillStyle = active ? '#E8B600' : '#1e1e1e';
+      ctx.fillRect(x - w/2 - 3, py - 2.5, 6, 5);
+
+      ctx.fillStyle = active ? '#888' : '#333';
+      ctx.textAlign = 'left';
+      ctx.fillText(`F${i + 1}`, x - w/2 + 8, py + 2);
+    }
+
+    // USB-C ports for RT III
+    if (proc.usbPorts > 0) {
+      for (let i = 0; i < proc.usbPorts; i++) {
+        const py = y + 16 + i * 10;
+        ctx.fillStyle = '#4080D0';
+        ctx.fillRect(x - w/2 - 3, py - 2.5, 6, 5);
+        ctx.fillStyle = '#666';
+        ctx.textAlign = 'left';
+        ctx.fillText(`U${i + 1}`, x - w/2 + 8, py + 2);
+      }
+    }
+
+    // Channel count
+    ctx.font = '400 8px "JetBrains Mono", monospace';
+    ctx.fillStyle = '#444';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${proc.fiberPorts} fiber ch`, x, y + h/2 - 10);
+  }
+
+  function drawCable(x1, y1, x2, y2, color, alpha, packetSeed) {
+    const cpOffset = (x2 - x1) * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.bezierCurveTo(x1 + cpOffset, y1, x2 - cpOffset, y2, x2, y2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Spawn packets along this cable
+    if (packetSeed >= 0 && time % 0.4 < 0.02) {
+      packets.push({
+        x1, y1, x2, y2, cpOffset,
+        t: 0,
+        color,
+        speed: 0.5 + Math.random() * 0.3,
+      });
+    }
+  }
+
+  function drawPackets() {
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const p = packets[i];
+      p.t += 0.012;
+      if (p.t > 1) { packets.splice(i, 1); continue; }
+
+      // Bezier position
+      const t = p.t;
+      const mt = 1 - t;
+      const cp1x = p.x1 + p.cpOffset;
+      const cp2x = p.x2 - p.cpOffset;
+      const px = mt*mt*mt*p.x1 + 3*mt*mt*t*cp1x + 3*mt*t*t*cp2x + t*t*t*p.x2;
+      const py = mt*mt*mt*p.y1 + 3*mt*mt*t*p.y1 + 3*mt*t*t*p.y2 + t*t*t*p.y2;
+
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.7 * (1 - t * 0.5);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // Also spawn fiber packets (hub to processor)
+    const L = getLayout();
+    if (time % 0.6 < 0.02) {
+      for (let hi = 0; hi < L.activeHubs; hi++) {
+        const hy = L.hubStartY + hi * L.hubSpacing;
+        const portY = L.procY - (L.activeHubs - 1) * 14 / 2 + hi * 14;
+        packets.push({
+          x1: L.hubX + 30, y1: hy,
+          x2: L.procX - 10, y2: portY,
+          cpOffset: (L.procX - 10 - L.hubX - 30) * 0.4,
+          t: 0, color: '#E8B600', speed: 0.4,
+        });
+      }
+    }
+  }
+
+  // ── HELPERS ──
+  function roundRectStroke(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function roundRectFill(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function updateCards() {
+    const proc = PROCESSORS[currentProc];
+    const hubCount = Math.ceil(cameraCount / 2);
+    const activeHubs = Math.min(hubCount, proc.maxHubs);
+    const maxCamsViaHub = proc.maxHubs * 2;
+
+    document.getElementById('cardProc').textContent = proc.name;
+    document.getElementById('cardPorts').textContent = proc.fiberPorts;
+    document.getElementById('cardHubs').textContent = proc.maxHubs;
+
+    let maxLabel = `${maxCamsViaHub} via hub`;
+    if (proc.usbPorts > 0) maxLabel += ` + ${proc.usbPorts} direct`;
+    document.getElementById('cardMaxCam').textContent = maxLabel;
+  }
+
+  // ── ANIMATION ──
+  function animate(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+    time += dt;
+
+    draw();
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastTime = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  document.getElementById('btnAddCam').addEventListener('click', () => {
+    const proc = PROCESSORS[currentProc];
+    if (cameraCount < proc.maxHubs * 2 + 2) { // allow 2 over for overflow demo
+      cameraCount++;
+      packets = [];
+      updateCards();
+    }
+  });
+
+  document.getElementById('btnRemoveCam').addEventListener('click', () => {
+    if (cameraCount > 1) {
+      cameraCount--;
+      packets = [];
+      updateCards();
+    }
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    cameraCount = 2;
+    packets = [];
+    updateCards();
+  });
+
+  document.querySelectorAll('#procToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#procToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentProc = chip.dataset.proc;
+      packets = [];
+      // Clamp camera count to reasonable max
+      const proc = PROCESSORS[currentProc];
+      const max = proc.maxHubs * 2 + 2;
+      if (cameraCount > max) cameraCount = max;
+      updateCards();
+    });
+  });
+
+  // ── TOUCH EVENTS (v2: mirror mouse interactions for mobile/tablet) ──
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  // ── INIT ──
+  resize();
+  updateCards();
+  window.addEventListener('resize', () => { resize(); });
+})();
+</script>
+</body>
+</html>

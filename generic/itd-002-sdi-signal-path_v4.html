@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-002: SDI Signal Path and Trigger Logic</title>
+<meta property="og:title" content="ITD-002: SDI Signal Path and Trigger Logic">
+<meta property="og:description" content="High-speed camera at a racecourse. 1000 fps to instant replay, no operator required.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --green: #22c55e;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin-right: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+
+  .subtitle {
+    font-size: 0.92em;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+  .subtitle span {
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 20px 0;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+  .panel:nth-of-type(3) { animation-delay: 0.6s; }
+  .panel:nth-of-type(4) { animation-delay: 0.7s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  /* SIGNAL CHAIN */
+  .chain-wrap {
+    position: relative;
+    overflow-x: auto;
+    padding: 8px 0 16px;
+  }
+  .chain {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: 700px;
+  }
+  .stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    min-width: 100px;
+  }
+  .stage-box {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 8px;
+    text-align: center;
+    background: var(--surface-raised);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+    z-index: 1;
+  }
+  .stage-box:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+  }
+  .stage-box.lit {
+    border-color: var(--gold);
+    background: rgba(255, 217, 77, 0.06);
+    box-shadow: 0 0 20px var(--gold-glow);
+  }
+  .stage-box.active {
+    border-color: var(--gold);
+    background: var(--gold-glow);
+    box-shadow: 0 0 30px rgba(255, 217, 77, 0.2);
+  }
+  .stage-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4em;
+    margin-bottom: 6px;
+    opacity: 0.3;
+    transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .stage-box.lit .stage-icon,
+  .stage-box.active .stage-icon { opacity: 1; }
+  .stage-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    transition: color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .stage-box.lit .stage-name,
+  .stage-box.active .stage-name { color: var(--gold); }
+  .stage-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    color: var(--text-muted);
+    margin-top: 4px;
+    transition: color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .stage-box.lit .stage-detail,
+  .stage-box.active .stage-detail { color: var(--text); }
+
+  /* Connectors */
+  .connector {
+    display: flex;
+    align-items: center;
+    width: 32px;
+    flex-shrink: 0;
+    justify-content: center;
+    position: relative;
+  }
+  .connector-line {
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+    transition: background 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .connector-line.lit { background: var(--gold); }
+  .connector-line::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: -3px;
+    width: 0; height: 0;
+    border-left: 6px solid rgba(255,255,255,0.08);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transition: border-left-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .connector-line.lit::after { border-left-color: var(--gold); }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 20px 0 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+  }
+  .btn-primary { background: var(--gold); color: var(--bg); }
+  .btn-primary:hover { box-shadow: 0 0 16px var(--gold-glow); }
+  .btn-secondary { background: var(--surface-raised); color: var(--text-dim); border: 1px solid var(--border); }
+  .btn-secondary.active { background: var(--surface-raised); color: var(--gold); border: 1px solid var(--gold); }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-dim);
+  }
+  .speed-ctrl input[type="range"] {
+    width: 80px;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+  input[type="range"]::-moz-range-track {
+    background: var(--surface-raised);
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: var(--gold);
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--gold);
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* TIMING BAR */
+  .timing-bar {
+    margin: 16px 0 4px;
+    height: 3px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .timing-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--gold);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+  }
+  .timing-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* COMPARISON PANEL */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .compare-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    background: var(--surface-raised);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .compare-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+  }
+  .compare-card.selected {
+    border-color: var(--gold);
+  }
+  .compare-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 12px;
+  }
+  .compare-card:first-child .compare-label { color: var(--red); }
+  .compare-card:last-child .compare-label { color: var(--green); }
+
+  /* Canvas for output comparison */
+  .output-canvas {
+    width: 100%;
+    height: 120px;
+    border-radius: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    display: block;
+  }
+  .compare-specs {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .spec-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+  }
+  .spec-row .spec-key { color: var(--text-dim); }
+  .spec-row .spec-val { color: var(--text); }
+  .compare-card:first-child .spec-row .spec-val.bad { color: var(--red); }
+  .compare-card:last-child .spec-row .spec-val.good { color: var(--green); }
+
+  /* TOGGLE */
+  .toggle-wrap {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    width: fit-content;
+  }
+  .toggle-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    padding: 6px 16px;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+  }
+  .toggle-btn:hover {
+    color: var(--text);
+  }
+  .toggle-btn.active {
+    background: var(--gold);
+    color: var(--bg);
+    font-weight: 600;
+  }
+
+  /* SPECS STRIP (data row, not chip row) */
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--gold);
+  }
+
+  /* INLINE SPEC CHIPS (camera/resolution/etc data row) */
+  .spec-strip-chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 16px 0 0;
+    padding: 14px 16px;
+    background: var(--gold-faint);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .spec-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .spec-chip strong {
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .spec-divider {
+    width: 1px;
+    background: var(--border);
+    align-self: stretch;
+  }
+
+  /* STATUS LOG */
+  .status-log {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    color: var(--text-dim);
+    min-height: 20px;
+    margin-top: 8px;
+  }
+  .status-log .highlight { color: var(--gold); }
+
+  /* NOTE */
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p { font-size: 0.88em; color: var(--text); line-height: 1.65; }
+  .note strong { color: #fff; }
+
+  /* FOOTER */
+  .itd-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+  }
+  .itd-footer a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 640px) {
+    .container { padding: 28px 14px 40px; }
+    h1 { font-size: 1.35em; }
+    .compare-grid { grid-template-columns: 1fr; }
+    .chain { min-width: 580px; }
+    .controls { gap: 8px; }
+    .speed-ctrl { margin-left: 0; width: 100%; justify-content: flex-start; }
+    .spec-strip-chips { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="itd-tag">ITD-002 / Interactive Technical Diagram</div>
+  <h1>SDI Signal Path and Trigger Logic</h1>
+  <p class="subtitle">High-speed camera deployed at a racecourse. <span>1000 fps</span> to instant replay, no operator required.</p>
+
+  <!-- SIGNAL CHAIN -->
+  <div class="panel">
+    <div class="panel-label">Signal Chain</div>
+    <div class="chain-wrap">
+      <div class="chain" id="chain">
+        <div class="stage">
+          <div class="stage-box" data-stage="0">
+            <div class="stage-icon">&#9672;</div>
+            <div class="stage-name">Motion Detect</div>
+            <div class="stage-detail">Video trigger</div>
+          </div>
+        </div>
+        <div class="connector"><div class="connector-line" data-conn="0"></div></div>
+        <div class="stage">
+          <div class="stage-box" data-stage="1">
+            <div class="stage-icon">&#9889;</div>
+            <div class="stage-name">Trigger</div>
+            <div class="stage-detail">Auto fire</div>
+          </div>
+        </div>
+        <div class="connector"><div class="connector-line" data-conn="1"></div></div>
+        <div class="stage">
+          <div class="stage-box" data-stage="2">
+            <div class="stage-icon">&#9679;</div>
+            <div class="stage-name">Record</div>
+            <div class="stage-detail">1000 fps</div>
+          </div>
+        </div>
+        <div class="connector"><div class="connector-line" data-conn="2"></div></div>
+        <div class="stage">
+          <div class="stage-box" data-stage="3">
+            <div class="stage-icon">&#9654;</div>
+            <div class="stage-name">Playback</div>
+            <div class="stage-detail">Auto loop</div>
+          </div>
+        </div>
+        <div class="connector"><div class="connector-line" data-conn="3"></div></div>
+        <div class="stage">
+          <div class="stage-box" data-stage="4">
+            <div class="stage-icon">&#9608;</div>
+            <div class="stage-name">3G-SDI Out</div>
+            <div class="stage-detail">50 Hz</div>
+          </div>
+        </div>
+        <div class="connector"><div class="connector-line" data-conn="4"></div></div>
+        <div class="stage">
+          <div class="stage-box" data-stage="5">
+            <div class="stage-icon">&#9636;</div>
+            <div class="stage-name">OB Truck</div>
+            <div class="stage-detail">Vision mixer</div>
+          </div>
+        </div>
+        <div class="connector"><div class="connector-line" data-conn="5"></div></div>
+        <div class="stage">
+          <div class="stage-box" data-stage="6">
+            <div class="stage-icon">&#9673;</div>
+            <div class="stage-name">On Air</div>
+            <div class="stage-detail">Instant replay</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timing bar -->
+    <div class="timing-bar"><div class="timing-fill" id="timingFill"></div></div>
+    <div class="timing-labels">
+      <span>0 ms</span>
+      <span>Trigger + Record</span>
+      <span>Playback + SDI</span>
+      <span>On Air</span>
+    </div>
+
+    <!-- Status log -->
+    <div class="status-log" id="statusLog">Press play to animate the signal chain.</div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-primary" id="playBtn">PLAY</button>
+      <button class="btn btn-secondary" id="resetBtn">RESET</button>
+      <div class="speed-ctrl">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="1" max="5" value="2" step="1">
+        <span class="speed-val" id="speedVal">2x</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BEFORE / AFTER COMPARISON -->
+  <div class="panel">
+    <div class="panel-label">Firmware Comparison: SDI Output</div>
+    <div class="toggle-wrap" id="toggleWrap">
+      <button class="toggle-btn active" data-mode="before">Before Fix</button>
+      <button class="toggle-btn" data-mode="after">After Fix</button>
+    </div>
+    <div class="compare-grid">
+      <div class="compare-card" id="cardBefore">
+        <div class="compare-label">Before Firmware Fix</div>
+        <canvas class="output-canvas" id="canvasBefore"></canvas>
+        <div class="compare-specs">
+          <div class="spec-row"><span class="spec-key">Resolution</span><span class="spec-val bad">Cropped / partial</span></div>
+          <div class="spec-row"><span class="spec-key">Framerate</span><span class="spec-val bad">Inconsistent</span></div>
+          <div class="spec-row"><span class="spec-key">SDI Output</span><span class="spec-val bad">Drops frames</span></div>
+          <div class="spec-row"><span class="spec-key">Replay</span><span class="spec-val bad">Stuttered</span></div>
+        </div>
+      </div>
+      <div class="compare-card" id="cardAfter">
+        <div class="compare-label">After Firmware Fix</div>
+        <canvas class="output-canvas" id="canvasAfter"></canvas>
+        <div class="compare-specs">
+          <div class="spec-row"><span class="spec-key">Resolution</span><span class="spec-val good">1920x1080 full frame</span></div>
+          <div class="spec-row"><span class="spec-key">Framerate</span><span class="spec-val good">Clean 50 Hz</span></div>
+          <div class="spec-row"><span class="spec-key">SDI Output</span><span class="spec-val good">Zero dropped frames</span></div>
+          <div class="spec-row"><span class="spec-key">Replay</span><span class="spec-val good">Smooth loop</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <p>The firmware fix addressed two issues: <strong>frame cropping</strong> during high-speed readout, and <strong>SDI timing instability</strong> that caused dropped frames in the broadcast chain. The result is a clean 50 Hz 3G-SDI output that integrates directly with the broadcaster's OB infrastructure.</p>
+    </div>
+  </div>
+
+  <!-- SPEC CHIPS -->
+  <div class="spec-strip-chips">
+    <div class="spec-chip"><strong>Resolution</strong> 1920x1080</div>
+    <div class="spec-divider"></div>
+    <div class="spec-chip"><strong>FPS</strong> 1000</div>
+    <div class="spec-divider"></div>
+    <div class="spec-chip"><strong>Output</strong> 3G-SDI 50Hz</div>
+    <div class="spec-divider"></div>
+    <div class="spec-chip"><strong>Control</strong> Ethernet</div>
+    <div class="spec-divider"></div>
+    <div class="spec-chip"><strong>Trigger</strong> Video-based</div>
+    <div class="spec-divider"></div>
+    <div class="spec-chip"><strong>Shock</strong> 200G</div>
+  </div>
+
+  <div class="note" style="margin-top: 20px;">
+    <p><strong>Deployment:</strong> 15 high-speed camera systems across UK and Ireland racecourses. Broadcast partners include Sky Sports Racing and RacingTV. Every camera operates autonomously. No operator touches the system between trigger and replay.</p>
+  </div>
+
+  <!-- SPECS STRIP -->
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-002</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">SDI Signal Path</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Play / Toggle / Hover</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Author</span>
+      <span class="spec-value">ciamac.com</span>
+    </div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-002 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── SIGNAL CHAIN ANIMATION ──
+
+  const stages = document.querySelectorAll('.stage-box');
+  const connectors = document.querySelectorAll('.connector-line');
+  const timingFill = document.getElementById('timingFill');
+  const statusLog = document.getElementById('statusLog');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const speedSlider = document.getElementById('speedSlider');
+  const speedVal = document.getElementById('speedVal');
+
+  const stageMessages = [
+    'Motion detected in camera field of view.',
+    'Video trigger fires. Recording armed.',
+    'Recording at <span class="highlight">1000 fps</span>, 1920x1080.',
+    'Playback begins. Autonomous loop engaged.',
+    '3G-SDI output locked at <span class="highlight">50 Hz</span>.',
+    'Signal received at OB truck vision mixer.',
+    '<span class="highlight">Instant replay on air.</span> Zero operator intervention.'
+  ];
+
+  let animTimer = null;
+  let currentStage = -1;
+  let isPlaying = false;
+
+  function getDelay() {
+    const speed = parseInt(speedSlider.value);
+    return [1200, 800, 500, 350, 200][speed - 1];
+  }
+
+  speedSlider.addEventListener('input', function() {
+    speedVal.textContent = this.value + 'x';
+  });
+
+  function lightStage(idx) {
+    if (idx < 0 || idx >= stages.length) return;
+    // Light the stage
+    stages[idx].classList.add('lit');
+    // Mark only current as active
+    stages.forEach((s, i) => s.classList.toggle('active', i === idx));
+    // Light the connector before this stage
+    if (idx > 0) connectors[idx - 1].classList.add('lit');
+    // Update timing bar
+    const pct = ((idx + 1) / stages.length) * 100;
+    timingFill.style.width = pct + '%';
+    // Update status
+    statusLog.innerHTML = stageMessages[idx];
+  }
+
+  function animateChain() {
+    currentStage++;
+    if (currentStage >= stages.length) {
+      isPlaying = false;
+      playBtn.textContent = 'REPLAY';
+      return;
+    }
+    lightStage(currentStage);
+    animTimer = setTimeout(animateChain, getDelay());
+  }
+
+  function resetChain() {
+    clearTimeout(animTimer);
+    animTimer = null;
+    currentStage = -1;
+    isPlaying = false;
+    stages.forEach(s => { s.classList.remove('lit', 'active'); });
+    connectors.forEach(c => c.classList.remove('lit'));
+    timingFill.style.width = '0%';
+    statusLog.textContent = 'Press play to animate the signal chain.';
+    playBtn.textContent = 'PLAY';
+  }
+
+  playBtn.addEventListener('click', function() {
+    if (isPlaying) return;
+    if (currentStage >= stages.length - 1) resetChain();
+    isPlaying = true;
+    playBtn.textContent = 'RUNNING';
+    // Small initial delay
+    setTimeout(animateChain, 200);
+  });
+
+  resetBtn.addEventListener('click', resetChain);
+
+  // ── HOVER on stages (manual inspection) ──
+  stages.forEach((s, i) => {
+    s.addEventListener('mouseenter', function() {
+      if (isPlaying) return;
+      statusLog.innerHTML = stageMessages[i];
+    });
+    s.addEventListener('mouseleave', function() {
+      if (isPlaying) return;
+      if (currentStage >= 0 && currentStage < stages.length) {
+        statusLog.innerHTML = stageMessages[currentStage];
+      } else {
+        statusLog.textContent = 'Press play to animate the signal chain.';
+      }
+    });
+  });
+
+  // ── BEFORE/AFTER COMPARISON ──
+
+  const toggleBtns = document.querySelectorAll('.toggle-btn');
+  const cardBefore = document.getElementById('cardBefore');
+  const cardAfter = document.getElementById('cardAfter');
+  const canvasBefore = document.getElementById('canvasBefore');
+  const canvasAfter = document.getElementById('canvasAfter');
+
+  let compMode = 'before';
+
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      compMode = this.dataset.mode;
+      toggleBtns.forEach(b => b.classList.toggle('active', b === this));
+      cardBefore.classList.toggle('selected', compMode === 'before');
+      cardAfter.classList.toggle('selected', compMode === 'after');
+    });
+  });
+
+  // ── CANVAS: Simulated SDI Output ──
+
+  function initCanvas(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    return { ctx, w: rect.width, h: rect.height, dpr: dpr };
+  }
+
+  // Draw simulated broadcast frames
+  let frameCount = 0;
+  let beforeDropTimer = 0;
+
+  function drawBeforeCanvas() {
+    const { ctx, w, h, dpr } = initCanvas(canvasBefore);
+    ctx.fillStyle = '#0c0c0c';
+    ctx.fillRect(0, 0, w, h);
+
+    frameCount++;
+    beforeDropTimer++;
+
+    // Simulated "horse" as simple shapes moving across
+    const baseX = ((frameCount * 1.8) % (w + 60)) - 30;
+
+    // Inconsistent framerate: sometimes skip, sometimes stutter
+    const drop = beforeDropTimer % 7 === 0 || beforeDropTimer % 13 === 0;
+
+    if (!drop) {
+      // Cropped frame (smaller area, offset)
+      const cropOffset = Math.sin(frameCount * 0.3) * 8;
+      const cropScale = 0.72 + Math.sin(frameCount * 0.15) * 0.05;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(w * (1 - cropScale) / 2, h * (1 - cropScale) / 2 + cropOffset,
+               w * cropScale, h * cropScale);
+      ctx.clip();
+
+      // Ground line
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.72);
+      ctx.lineTo(w, h * 0.72);
+      ctx.stroke();
+
+      // "Horse" silhouette (simple geometric)
+      ctx.fillStyle = '#3a3a3a';
+      // Body
+      ctx.fillRect(baseX - 18, h * 0.72 - 28, 36, 16);
+      // Legs (jittery due to inconsistent fps)
+      const legJitter = (beforeDropTimer % 3) * 3;
+      ctx.fillRect(baseX - 14, h * 0.72 - 12, 4, 14 + legJitter);
+      ctx.fillRect(baseX + 10, h * 0.72 - 12, 4, 14 - legJitter);
+      // Head
+      ctx.fillRect(baseX + 16, h * 0.72 - 38, 8, 14);
+
+      // Scanline artifacts
+      ctx.fillStyle = 'rgba(217, 64, 64, 0.08)';
+      for (let y = 0; y < h; y += 12) {
+        if (Math.random() > 0.7) {
+          ctx.fillRect(0, y, w, 1);
+        }
+      }
+
+      ctx.restore();
+
+      // Crop border indicator
+      ctx.strokeStyle = '#D94040';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(w * (1 - cropScale) / 2, h * (1 - cropScale) / 2 + cropOffset,
+                      w * cropScale, h * cropScale);
+      ctx.setLineDash([]);
+    } else {
+      // Dropped frame
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#D94040';
+      ctx.font = `10px "JetBrains Mono", monospace`;
+      ctx.textAlign = 'center';
+      ctx.fillText('FRAME DROPPED', w / 2, h / 2);
+    }
+
+    // Frame counter
+    ctx.fillStyle = '#444';
+    ctx.font = `9px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('SDI OUT', 6, 14);
+    if (drop) {
+      ctx.fillStyle = '#D94040';
+      ctx.fillText('NO SYNC', w - 56, 14);
+    }
+  }
+
+  function drawAfterCanvas() {
+    const { ctx, w, h, dpr } = initCanvas(canvasAfter);
+    ctx.fillStyle = '#0c0c0c';
+    ctx.fillRect(0, 0, w, h);
+
+    const baseX = ((frameCount * 1.8) % (w + 60)) - 30;
+
+    // Full frame, clean output
+    // Ground
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.72);
+    ctx.lineTo(w, h * 0.72);
+    ctx.stroke();
+
+    // Rail
+    ctx.strokeStyle = '#1e1e1e';
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.72 + 6);
+    ctx.lineTo(w, h * 0.72 + 6);
+    ctx.stroke();
+
+    // "Horse" silhouette (clean, smooth motion)
+    ctx.fillStyle = '#666';
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(baseX, h * 0.72 - 22, 20, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Legs (smooth gait cycle)
+    const gait = Math.sin(frameCount * 0.2) * 6;
+    ctx.fillRect(baseX - 14, h * 0.72 - 12, 3, 14 + gait);
+    ctx.fillRect(baseX - 6, h * 0.72 - 12, 3, 14 - gait);
+    ctx.fillRect(baseX + 6, h * 0.72 - 12, 3, 14 + gait * 0.8);
+    ctx.fillRect(baseX + 14, h * 0.72 - 12, 3, 14 - gait * 0.8);
+    // Neck + head
+    ctx.fillStyle = '#666';
+    ctx.beginPath();
+    ctx.moveTo(baseX + 16, h * 0.72 - 26);
+    ctx.lineTo(baseX + 24, h * 0.72 - 42);
+    ctx.lineTo(baseX + 30, h * 0.72 - 38);
+    ctx.lineTo(baseX + 20, h * 0.72 - 22);
+    ctx.fill();
+    // Head
+    ctx.beginPath();
+    ctx.ellipse(baseX + 28, h * 0.72 - 42, 7, 5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Clean scanlines (subtle)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)';
+    for (let y = 0; y < h; y += 2) {
+      ctx.fillRect(0, y, w, 1);
+    }
+
+    // Frame info
+    ctx.fillStyle = '#40B060';
+    ctx.font = `9px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillText('SDI OUT', 6, 14);
+    ctx.fillText('1080p50', w - 56, 14);
+
+    // Full-frame border
+    ctx.strokeStyle = 'rgba(64, 176, 96, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(1, 1, w - 2, h - 2);
+  }
+
+  // ── CANVAS ANIMATION with IntersectionObserver ──
+
+  let canvasAnim = null;
+
+  function animateCanvases() {
+    drawBeforeCanvas();
+    drawAfterCanvas();
+    canvasAnim = requestAnimationFrame(animateCanvases);
+  }
+
+  // Observe the comparison panel to pause/resume the rAF loop
+  const compPanel = canvasBefore.closest('.panel');
+  const canvasObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        if (!canvasAnim) canvasAnim = requestAnimationFrame(animateCanvases);
+      } else {
+        if (canvasAnim) { cancelAnimationFrame(canvasAnim); canvasAnim = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  canvasObserver.observe(compPanel);
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+    if (canvasAnim) {
+      drawBeforeCanvas();
+      drawAfterCanvas();
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

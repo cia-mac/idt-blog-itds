@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-012: Connection Topology</title>
+<meta property="og:title" content="ITD-012: Connection Topology">
+<meta property="og:description" content="Three connection types. Five processors. One system.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #E8B600;
+    --gold-dim: rgba(232,182,0,0.5);
+    --gold-glow: rgba(232,182,0,0.12);
+    --gold-faint: rgba(232,182,0,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --green: #22c55e;
+    --blue: #4080D0;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #f0d060);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin-right: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+
+  .subtitle {
+    font-size: 0.92em;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 20px 0;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+  .panel:nth-of-type(3) { animation-delay: 0.6s; }
+  .panel:nth-of-type(4) { animation-delay: 0.7s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  #topoCanvas {
+    width: 100%;
+    height: 500px;
+    display: block;
+    border-radius: var(--radius-sm);
+    cursor: grab;
+  }
+  #topoCanvas:active { cursor: grabbing; }
+
+  /* -- CAMERA PALETTE -- */
+  .palette {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .palette-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .palette-item:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .palette-item.fiber { border-left: 3px solid var(--gold); }
+  .palette-item.usbc { border-left: 3px solid var(--blue); }
+  .palette-item.eth { border-left: 3px solid var(--red); }
+  .palette-item.hub { border-left: 3px solid var(--green); }
+
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toggle-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-right: 6px;
+  }
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 8px 16px;
+    cursor: pointer;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: none;
+    transition: background 0.3s cubic-bezier(0.22, 1, 0.36, 1), color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .chip:hover { background: var(--border-hover); color: var(--text); }
+  .chip.active { background: var(--gold); color: var(--bg); font-weight: 600; }
+
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    transition: border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .readout-card:hover { border-color: var(--border-hover); }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: var(--text);
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: var(--gold); }
+  .readout-card-value.red { color: var(--red); }
+  .readout-card-value.green { color: var(--green); }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 9px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:hover { transform: translateY(-1px); opacity: 0.92; }
+  .btn-primary { background: var(--gold); color: var(--bg); }
+  .btn-secondary { background: var(--surface-raised); color: var(--text-dim); border: 1px solid var(--border); }
+  .btn-secondary:hover { color: var(--text); border-color: var(--border-hover); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(232,182,0,0.2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p { font-size: 0.88em; color: var(--text); line-height: 1.65; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+  }
+  .itd-footer a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .itd-footer a:hover { color: #f0d060; }
+
+  /* -- Firefox slider styling -- */
+  input[type="range"]::-moz-range-track {
+    background: var(--text-muted);
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: var(--gold);
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #topoCanvas { height: 400px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-012 / Interactive Technical Diagram</div>
+  <h1>Connection Topology</h1>
+  <div class="subtitle">Three connection types. Five processors. One system.</div>
+
+  <div class="panel">
+    <div class="panel-label">System Builder</div>
+    <canvas id="topoCanvas"></canvas>
+    <div class="controls">
+      <button class="btn btn-secondary" id="btnClear">Clear All</button>
+      <button class="btn btn-secondary" id="btnPreset1">Preset: Broadcast</button>
+      <button class="btn btn-secondary" id="btnPreset2">Preset: Crash Lab</button>
+      <button class="btn btn-secondary" id="btnPreset3">Preset: Max Config</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Add Components</div>
+    <div class="toggle-row">
+      <span class="toggle-group-label">Processor</span>
+      <div class="toggle-group" id="procToggle">
+        <button class="chip active" data-proc="rtv">RT V</button>
+        <button class="chip" data-proc="rt4">RT IV</button>
+        <button class="chip" data-proc="rt3">RT III</button>
+        <button class="chip" data-proc="viper">Viper</button>
+      </div>
+    </div>
+    <div class="palette" id="cameraPalette">
+      <div class="palette-item fiber" data-cam="phoenix">+ Phoenix</div>
+      <div class="palette-item fiber" data-cam="galileo">+ Galileo</div>
+      <div class="palette-item fiber" data-cam="helios">+ Helios 8K</div>
+      <div class="palette-item fiber" data-cam="xs2">+ XS II</div>
+      <div class="palette-item usbc" data-cam="xsm">+ XSM</div>
+      <div class="palette-item usbc" data-cam="os2">+ OS II</div>
+      <div class="palette-item usbc" data-cam="sugarcube">+ SugarCube</div>
+      <div class="palette-item eth" data-cam="ccm">+ CrashCam Mini</div>
+      <div class="palette-item hub" data-cam="xslink">+ XSLink Hub</div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Cameras</div>
+        <div class="readout-card-value gold" id="cardCams">0</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Channels Used</div>
+        <div class="readout-card-value" id="cardCh">0 / 0</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Warnings</div>
+        <div class="readout-card-value" id="cardWarn">None</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Data Rate</div>
+        <div class="readout-card-value" id="cardRate">0 Gbps</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p>High speed cameras connect through three protocols. <strong>Fiber (QSFP)</strong> runs long distances at full bandwidth, used by Phoenix, Galileo, Helios, and XS II. <strong>USB-C</strong> connects compact cameras (XSM, OS II, SugarCube) directly or through an XSLink Hub that bridges two USB-C streams into one fiber port. <strong>Ethernet</strong> is reserved for CrashCam systems via the Viper processor. Dual-connection cameras (Phoenix, Galileo) can use two channels for full frame rate or one channel at half speed. The Helios 8K requires GPU processing and is blocked from the RT III.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-012</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">System Architecture</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Drag + Build</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Author</span>
+      <span class="spec-value">ciamac.com</span>
+    </div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-012 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // -- DATA --
+  const PROCS = {
+    rtv:   { name: 'RT V',         fiber: 4, usbc: 0, eth: 0, color: '#E8B600', maxHubs: 4, gpu: true },
+    rt4:   { name: 'RT IV',        fiber: 2, usbc: 0, eth: 0, color: '#4080D0', maxHubs: 2, gpu: true },
+    rt3:   { name: 'RT III',       fiber: 1, usbc: 2, eth: 0, color: '#40B060', maxHubs: 1, gpu: false },
+    viper: { name: 'Viper',        fiber: 0, usbc: 0, eth: 4, color: '#D94040', maxHubs: 0, gpu: false },
+  };
+
+  const CAMS = {
+    phoenix:   { name: 'Phoenix',      conn: 'fiber', dual: true,  channels: 2, gbps: 6.4,  weight: 710, needsGpu: false },
+    galileo:   { name: 'Galileo',      conn: 'fiber', dual: true,  channels: 2, gbps: 6.4,  weight: 1026, needsGpu: false },
+    helios:    { name: 'Helios 8K',    conn: 'fiber', dual: false, channels: 1, gbps: 8.0,  weight: 1321, needsGpu: true },
+    xs2:       { name: 'XS II',        conn: 'fiber', dual: false, channels: 1, gbps: 3.2,  weight: 670, needsGpu: false },
+    xsm:       { name: 'XSM',          conn: 'usbc',  dual: false, channels: 1, gbps: 2.0,  weight: 200, needsGpu: false },
+    os2:       { name: 'OS II',        conn: 'usbc',  dual: false, channels: 1, gbps: 3.2,  weight: 400, needsGpu: false },
+    sugarcube: { name: 'SugarCube',    conn: 'usbc',  dual: false, channels: 1, gbps: 1.5,  weight: 54, needsGpu: false },
+    ccm:       { name: 'CCM',          conn: 'eth',   dual: false, channels: 1, gbps: 1.0,  weight: 270, needsGpu: false },
+    xslink:    { name: 'XSLink Hub',   conn: 'hub',   dual: false, channels: 0, gbps: 0,    weight: 0, needsGpu: false },
+  };
+
+  const CONN_COLORS = { fiber: '#E8B600', usbc: '#4080D0', eth: '#D94040', hub: '#40B060' };
+
+  // -- STATE --
+  let currentProc = 'rtv';
+  let nodes = []; // { id, type, camKey, x, y, dragging }
+  let nextId = 1;
+  let animId = null;
+  let lastTime = 0;
+  let time = 0;
+  let dragNode = null;
+  let dragOffX = 0, dragOffY = 0;
+  let packets = [];
+  let warnings = [];
+
+  // -- CANVAS --
+  const canvas = document.getElementById('topoCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function getDpr() { return window.devicePixelRatio || 1; }
+
+  function resize() {
+    const dpr = getDpr();
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function getW() { return canvas.getBoundingClientRect().width; }
+  function getH() { return canvas.getBoundingClientRect().height; }
+
+  // -- Helper: font string --
+  function dprFont(weight, size, family) {
+    return `${weight} ${size}px ${family}`;
+  }
+
+  // -- Helper: clamp drag position within canvas bounds --
+  function clampPos(node) {
+    const w = getW();
+    const h = getH();
+    const margin = 25; // half-width of largest component (hub is 48/2=24)
+    node.x = Math.max(margin, Math.min(w - margin, node.x));
+    node.y = Math.max(margin, Math.min(h - margin, node.y));
+  }
+
+  // -- PROCESSOR POSITION --
+  function procPos() {
+    return { x: getW() - 100, y: getH() / 2 };
+  }
+
+  // -- ADD NODE --
+  function addNode(camKey) {
+    const cam = CAMS[camKey];
+    const w = getW();
+    const h = getH();
+    // Place cameras on the left side, staggered
+    const camNodes = nodes.filter(n => n.type === 'camera');
+    const hubNodes = nodes.filter(n => n.type === 'hub');
+    let startX, startY;
+
+    if (camKey === 'xslink') {
+      startX = w * 0.45 + hubNodes.length * 20;
+      startY = 80 + hubNodes.length * 70;
+      nodes.push({ id: nextId++, type: 'hub', camKey, x: startX, y: startY, usbSlots: 2, usedSlots: 0 });
+    } else {
+      startX = 60 + (camNodes.length % 3) * 30;
+      startY = 60 + Math.floor(camNodes.length / 3) * 70 + (camNodes.length % 3) * 25;
+      nodes.push({ id: nextId++, type: 'camera', camKey, x: startX, y: Math.min(startY, h - 60) });
+    }
+    validate();
+    updateCards();
+  }
+
+  // -- VALIDATION --
+  function validate() {
+    warnings = [];
+    const proc = PROCS[currentProc];
+    const cameras = nodes.filter(n => n.type === 'camera');
+    const hubs = nodes.filter(n => n.type === 'hub');
+
+    let fiberUsed = 0;
+    let usbcUsed = 0;
+    let ethUsed = 0;
+
+    // Reset hub slots
+    hubs.forEach(h => h.usedSlots = 0);
+
+    for (const cam of cameras) {
+      const spec = CAMS[cam.camKey];
+
+      if (spec.conn === 'fiber') {
+        const chNeeded = spec.dual ? 2 : 1;
+        fiberUsed += chNeeded;
+      } else if (spec.conn === 'usbc') {
+        // Try direct USB-C first
+        if (usbcUsed < proc.usbc) {
+          usbcUsed++;
+        } else {
+          // Try hub
+          const availHub = hubs.find(h => h.usedSlots < 2);
+          if (availHub) {
+            availHub.usedSlots++;
+          } else {
+            warnings.push(`${spec.name}: no USB-C port or hub available`);
+          }
+        }
+      } else if (spec.conn === 'eth') {
+        ethUsed++;
+      }
+
+      // GPU check
+      if (spec.needsGpu && !proc.gpu) {
+        warnings.push(`${spec.name} requires GPU (blocked on ${proc.name})`);
+      }
+
+      // Connection type check
+      if (spec.conn === 'fiber' && proc.fiber === 0) {
+        warnings.push(`${spec.name} needs fiber (${proc.name} has none)`);
+      }
+      if (spec.conn === 'eth' && proc.eth === 0) {
+        warnings.push(`${spec.name} needs Ethernet (${proc.name} has none)`);
+      }
+    }
+
+    // Hubs use fiber ports
+    const hubsWithCams = hubs.filter(h => h.usedSlots > 0);
+    fiberUsed += hubsWithCams.length;
+
+    if (fiberUsed > proc.fiber) {
+      warnings.push(`Fiber ports exceeded: ${fiberUsed} needed, ${proc.fiber} available`);
+    }
+    if (ethUsed > proc.eth) {
+      warnings.push(`Ethernet ports exceeded: ${ethUsed} needed, ${proc.eth} available`);
+    }
+    if (hubs.length > proc.maxHubs) {
+      warnings.push(`Max ${proc.maxHubs} hubs on ${proc.name}`);
+    }
+
+    return { fiberUsed, usbcUsed, ethUsed };
+  }
+
+  // -- DRAW --
+  function draw() {
+    const w = getW();
+    const h = getH();
+    const dpr = getDpr();
+    ctx.clearRect(0, 0, w, h);
+
+    const proc = PROCS[currentProc];
+    const pp = procPos();
+    const usage = validate();
+
+    // -- CONNECTION LINES --
+    const cameras = nodes.filter(n => n.type === 'camera');
+    const hubs = nodes.filter(n => n.type === 'hub');
+
+    for (const cam of cameras) {
+      const spec = CAMS[cam.camKey];
+      let targetX, targetY, color;
+
+      if (spec.conn === 'usbc') {
+        // Find assigned hub or direct port
+        const hub = hubs.find(hub_ => {
+          // Simple: closest hub with capacity
+          return true;
+        });
+        const assignedHub = hubs.find(h => h.usedSlots > 0);
+        if (assignedHub && proc.usbc === 0) {
+          targetX = assignedHub.x;
+          targetY = assignedHub.y;
+          color = CONN_COLORS.usbc;
+        } else {
+          targetX = pp.x;
+          targetY = pp.y;
+          color = CONN_COLORS.usbc;
+        }
+      } else if (spec.conn === 'eth') {
+        targetX = pp.x;
+        targetY = pp.y;
+        color = CONN_COLORS.eth;
+      } else {
+        targetX = pp.x;
+        targetY = pp.y;
+        color = CONN_COLORS.fiber;
+      }
+
+      const hasWarning = warnings.some(w_ => w_.includes(spec.name));
+      drawCable(cam.x + 20, cam.y, targetX - 50, targetY, color, hasWarning ? 0.1 : 0.2);
+    }
+
+    // Hub to processor lines
+    for (const hub of hubs) {
+      if (hub.usedSlots > 0) {
+        drawCable(hub.x + 24, hub.y, pp.x - 50, pp.y, CONN_COLORS.fiber, 0.3);
+      }
+    }
+
+    // -- PROCESSOR --
+    drawProcessor(pp.x, pp.y, proc, usage);
+
+    // -- HUBS --
+    for (const hub of hubs) {
+      drawHubNode(hub);
+    }
+
+    // -- CAMERAS --
+    for (const cam of cameras) {
+      drawCameraNode(cam);
+    }
+
+    // -- PACKETS --
+    updatePackets();
+    for (const p of packets) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.6 * (1 - p.t * 0.3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // -- EMPTY STATE --
+    if (nodes.length === 0) {
+      ctx.font = dprFont('400', 12, '"JetBrains Mono", monospace');
+      ctx.fillStyle = '#2a2a2a';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click components below to build a system', w / 2, h / 2 - 30);
+      ctx.fillText('Drag to reposition', w / 2, h / 2 - 10);
+    }
+  }
+
+  function drawCable(x1, y1, x2, y2, color, alpha) {
+    const cp = (x2 - x1) * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.bezierCurveTo(x1 + cp, y1, x2 - cp, y2, x2, y2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawProcessor(x, y, proc, usage) {
+    const w = 90;
+    const portCount = proc.fiber + proc.usbc + proc.eth;
+    const h_ = 50 + portCount * 16;
+
+    // Body
+    ctx.fillStyle = '#141414';
+    roundRect(ctx, x - w/2, y - h_/2, w, h_, 8);
+    ctx.strokeStyle = proc.color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - w/2, y - h_/2, w, h_);
+
+    // Name
+    ctx.font = dprFont('700', 9, '"JetBrains Mono", monospace');
+    ctx.fillStyle = proc.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(proc.name, x, y - h_/2 + 16);
+
+    // Ports
+    let py = y - h_/2 + 28;
+    ctx.font = dprFont('400', 7, '"JetBrains Mono", monospace');
+
+    for (let i = 0; i < proc.fiber; i++) {
+      const used = i < usage.fiberUsed;
+      ctx.fillStyle = used ? CONN_COLORS.fiber : '#1e1e1e';
+      ctx.fillRect(x - w/2 - 3, py - 3, 6, 6);
+      ctx.fillStyle = used ? '#888' : '#333';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Fiber ${i+1}`, x - w/2 + 8, py + 2);
+      py += 14;
+    }
+    for (let i = 0; i < proc.usbc; i++) {
+      const used = i < usage.usbcUsed;
+      ctx.fillStyle = used ? CONN_COLORS.usbc : '#1e1e1e';
+      ctx.fillRect(x - w/2 - 3, py - 3, 6, 6);
+      ctx.fillStyle = used ? '#888' : '#333';
+      ctx.textAlign = 'left';
+      ctx.fillText(`USB ${i+1}`, x - w/2 + 8, py + 2);
+      py += 14;
+    }
+    for (let i = 0; i < proc.eth; i++) {
+      const used = i < usage.ethUsed;
+      ctx.fillStyle = used ? CONN_COLORS.eth : '#1e1e1e';
+      ctx.fillRect(x - w/2 - 3, py - 3, 6, 6);
+      ctx.fillStyle = used ? '#888' : '#333';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Eth ${i+1}`, x - w/2 + 8, py + 2);
+      py += 14;
+    }
+  }
+
+  function drawCameraNode(node) {
+    const spec = CAMS[node.camKey];
+    const hasWarning = warnings.some(w_ => w_.includes(spec.name));
+    const color = hasWarning ? '#D94040' : CONN_COLORS[spec.conn];
+    const w = 40, h_ = 30;
+
+    // Body
+    ctx.fillStyle = '#1a1a1a';
+    roundRect(ctx, node.x - w/2, node.y - h_/2, w, h_, 5);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = hasWarning ? 2 : 1.5;
+    ctx.strokeRect(node.x - w/2, node.y - h_/2, w, h_);
+
+    // Lens
+    ctx.beginPath();
+    ctx.arc(node.x - 5, node.y, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Label
+    ctx.font = dprFont('600', 7, '"JetBrains Mono", monospace');
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.fillText(spec.name, node.x, node.y + h_/2 + 10);
+
+    // Connection type badge
+    ctx.font = dprFont('400', 6, '"JetBrains Mono", monospace');
+    ctx.fillStyle = '#444';
+    const connLabel = spec.conn === 'fiber' ? 'FIBER' : spec.conn === 'usbc' ? 'USB-C' : 'ETH';
+    ctx.fillText(connLabel, node.x, node.y + h_/2 + 20);
+
+    // Dual indicator
+    if (spec.dual) {
+      ctx.font = dprFont('500', 5, '"JetBrains Mono", monospace');
+      ctx.fillStyle = '#E8B600';
+      ctx.fillText('2CH', node.x + w/2 - 2, node.y - h_/2 - 3);
+    }
+
+    // Warning icon
+    if (hasWarning) {
+      ctx.font = dprFont('700', 10, '"JetBrains Mono", monospace');
+      ctx.fillStyle = '#D94040';
+      ctx.textAlign = 'right';
+      ctx.fillText('!', node.x + w/2 + 2, node.y - h_/2 + 2);
+    }
+  }
+
+  function drawHubNode(node) {
+    const w = 48, h_ = 28;
+    const color = CONN_COLORS.hub;
+
+    ctx.fillStyle = '#131313';
+    roundRect(ctx, node.x - w/2, node.y - h_/2, w, h_, 5);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(node.x - w/2, node.y - h_/2, w, h_);
+
+    // USB indicators
+    for (let i = 0; i < 2; i++) {
+      const py = node.y - 5 + i * 10;
+      ctx.fillStyle = i < node.usedSlots ? CONN_COLORS.usbc : '#1e1e1e';
+      ctx.fillRect(node.x - w/2 - 3, py - 2, 5, 4);
+    }
+
+    // Fiber out
+    ctx.fillStyle = node.usedSlots > 0 ? CONN_COLORS.fiber : '#1e1e1e';
+    ctx.fillRect(node.x + w/2 - 2, node.y - 2, 5, 4);
+
+    ctx.font = dprFont('600', 6, '"JetBrains Mono", monospace');
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.fillText('XSLink', node.x, node.y + 3);
+
+    ctx.font = dprFont('400', 6, '"JetBrains Mono", monospace');
+    ctx.fillStyle = '#444';
+    ctx.fillText(`${node.usedSlots}/2`, node.x, node.y + h_/2 + 10);
+  }
+
+  function roundRect(ctx_, x, y, w, h, r) {
+    ctx_.beginPath();
+    ctx_.moveTo(x + r, y);
+    ctx_.lineTo(x + w - r, y);
+    ctx_.arcTo(x + w, y, x + w, y + r, r);
+    ctx_.lineTo(x + w, y + h - r);
+    ctx_.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx_.lineTo(x + r, y + h);
+    ctx_.arcTo(x, y + h, x, y + h - r, r);
+    ctx_.lineTo(x, y + r);
+    ctx_.arcTo(x, y, x + r, y, r);
+    ctx_.closePath();
+    ctx_.fill();
+  }
+
+  // -- PACKETS --
+  function updatePackets() {
+    // Spawn
+    if (Math.random() < 0.04) {
+      const cameras = nodes.filter(n => n.type === 'camera');
+      if (cameras.length > 0) {
+        const cam = cameras[Math.floor(Math.random() * cameras.length)];
+        const spec = CAMS[cam.camKey];
+        const pp = procPos();
+        packets.push({
+          x: cam.x + 20, y: cam.y,
+          tx: pp.x - 50, ty: pp.y,
+          t: 0,
+          color: CONN_COLORS[spec.conn],
+        });
+      }
+    }
+
+    // Update
+    for (let i = packets.length - 1; i >= 0; i--) {
+      const p = packets[i];
+      p.t += 0.015;
+      const t = p.t;
+      p.x = p.x + (p.tx - p.x) * 0.015;
+      p.y = p.y + (p.ty - p.y) * 0.015;
+      if (p.t > 1) packets.splice(i, 1);
+    }
+  }
+
+  function updateCards() {
+    const cameras = nodes.filter(n => n.type === 'camera');
+    const proc = PROCS[currentProc];
+    const usage = validate();
+    const totalCh = proc.fiber + proc.usbc + proc.eth;
+    const usedCh = usage.fiberUsed + usage.usbcUsed + usage.ethUsed;
+    const totalGbps = cameras.reduce((sum, c) => sum + CAMS[c.camKey].gbps, 0);
+
+    document.getElementById('cardCams').textContent = cameras.length;
+    document.getElementById('cardCh').textContent = `${usedCh} / ${totalCh}`;
+    document.getElementById('cardRate').textContent = `${totalGbps.toFixed(1)} Gbps`;
+
+    const warnEl = document.getElementById('cardWarn');
+    if (warnings.length > 0) {
+      warnEl.textContent = warnings.length + ' issue' + (warnings.length > 1 ? 's' : '');
+      warnEl.className = 'readout-card-value red';
+    } else {
+      warnEl.textContent = cameras.length > 0 ? 'None' : '--';
+      warnEl.className = 'readout-card-value green';
+    }
+  }
+
+  // -- DRAG (mouse) --
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    for (const node of nodes) {
+      const dx = mx - node.x;
+      const dy = my - node.y;
+      if (Math.abs(dx) < 25 && Math.abs(dy) < 20) {
+        dragNode = node;
+        dragOffX = dx;
+        dragOffY = dy;
+        canvas.style.cursor = 'grabbing';
+        return;
+      }
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (!dragNode) return;
+    const rect = canvas.getBoundingClientRect();
+    dragNode.x = e.clientX - rect.left - dragOffX;
+    dragNode.y = e.clientY - rect.top - dragOffY;
+    clampPos(dragNode);
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    dragNode = null;
+    canvas.style.cursor = 'grab';
+  });
+
+  // Touch support (DPR-aware coordinates + bounds clamping)
+  canvas.addEventListener('touchstart', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const scaleX = rect.width / (canvas.width / getDpr());
+    const scaleY = rect.height / (canvas.height / getDpr());
+    const mx = (touch.clientX - rect.left) / scaleX;
+    const my = (touch.clientY - rect.top) / scaleY;
+    for (const node of nodes) {
+      if (Math.abs(mx - node.x) < 30 && Math.abs(my - node.y) < 25) {
+        dragNode = node;
+        dragOffX = mx - node.x;
+        dragOffY = my - node.y;
+        e.preventDefault();
+        return;
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (!dragNode) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const scaleX = rect.width / (canvas.width / getDpr());
+    const scaleY = rect.height / (canvas.height / getDpr());
+    dragNode.x = (touch.clientX - rect.left) / scaleX - dragOffX;
+    dragNode.y = (touch.clientY - rect.top) / scaleY - dragOffY;
+    clampPos(dragNode);
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', () => { dragNode = null; });
+
+  // -- CONTROLS --
+  document.querySelectorAll('#procToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#procToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentProc = chip.dataset.proc;
+      validate();
+      updateCards();
+    });
+  });
+
+  document.querySelectorAll('.palette-item').forEach(item => {
+    item.addEventListener('click', () => {
+      addNode(item.dataset.cam);
+    });
+  });
+
+  document.getElementById('btnClear').addEventListener('click', () => {
+    nodes = [];
+    packets = [];
+    warnings = [];
+    updateCards();
+  });
+
+  document.getElementById('btnPreset1').addEventListener('click', () => {
+    nodes = [];
+    currentProc = 'rt4';
+    document.querySelectorAll('#procToggle .chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-proc="rt4"]').classList.add('active');
+    addNode('phoenix'); addNode('phoenix');
+    updateCards();
+  });
+
+  document.getElementById('btnPreset2').addEventListener('click', () => {
+    nodes = [];
+    currentProc = 'viper';
+    document.querySelectorAll('#procToggle .chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-proc="viper"]').classList.add('active');
+    addNode('ccm'); addNode('ccm'); addNode('ccm'); addNode('ccm');
+    updateCards();
+  });
+
+  document.getElementById('btnPreset3').addEventListener('click', () => {
+    nodes = [];
+    currentProc = 'rtv';
+    document.querySelectorAll('#procToggle .chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('[data-proc="rtv"]').classList.add('active');
+    addNode('xslink'); addNode('xslink');
+    addNode('phoenix'); addNode('galileo');
+    addNode('xsm'); addNode('xsm'); addNode('os2'); addNode('os2');
+    updateCards();
+  });
+
+  // -- ANIMATION --
+  function animate(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = (ts - lastTime) / 1000;
+    lastTime = ts;
+    time += dt;
+    draw();
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastTime = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // -- INIT --
+  resize();
+  updateCards();
+  window.addEventListener('resize', resize);
+})();
+</script>
+</body>
+</html>
