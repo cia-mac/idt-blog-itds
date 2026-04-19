@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-020: What Slow Motion Actually Is</title>
+<meta property="og:title" content="ITD-020: What Slow Motion Actually Is">
+<meta property="og:description" content="A mousetrap snaps closed in 5 ms. Your eye sees a blur. Raise the frame rate and watch the lever swing.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.7em, 4.5vw, 2.3em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.95em; color: var(--text-dim); max-width: 620px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .stage {
+    position: relative;
+    background: #0a0a0d;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  #sceneCanvas {
+    width: 100%; height: 540px;
+    display: block; background: #0a0a0d;
+  }
+
+  .hud-top {
+    position: absolute; top: 18px; left: 20px; right: 20px;
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-dim);
+    pointer-events: none;
+    letter-spacing: 0.5px;
+  }
+  .hud-top .hud-right { color: var(--gold); }
+  .hud-center {
+    position: absolute; left: 50%; top: 52%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    text-align: center;
+    opacity: 0; transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hud-center.visible { opacity: 1; }
+  .hud-center .factor {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(2em, 6vw, 4em);
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .hud-center .factor-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  .controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 18px 24px;
+    background: linear-gradient(to top, rgba(9,9,11,0.96) 40%, rgba(9,9,11,0));
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    z-index: 2;
+  }
+  .btn-play {
+    font-family: 'JetBrains Mono', monospace;
+    border: none; padding: 10px 22px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-weight: 700; font-size: 0.78em; letter-spacing: 0.6px;
+    background: var(--gold); color: var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn-play:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .rate-wrap {
+    flex: 1; display: flex; align-items: center; gap: 14px; min-width: 240px;
+  }
+  .rate-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); white-space: nowrap;
+  }
+  .rate-slider {
+    flex: 1; -webkit-appearance: none;
+    height: 4px; background: var(--surface-raised); border-radius: 2px; outline: none;
+  }
+  .rate-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--gold); cursor: pointer; border: 3px solid var(--bg);
+    box-shadow: 0 0 10px var(--gold-glow);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .rate-slider::-webkit-slider-thumb:hover { transform: scale(1.1); box-shadow: 0 0 18px var(--gold); }
+  .rate-slider::-moz-range-track { background: var(--border-hover); height: 4px; border: none; border-radius: 2px; }
+  .rate-slider::-moz-range-thumb { background: var(--gold); border: none; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; }
+  .rate-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1em; font-weight: 700; color: var(--gold);
+    min-width: 120px; text-align: right; letter-spacing: -0.3px;
+  }
+  .rate-value .unit { font-size: 0.6em; color: var(--text-dim); font-weight: 400; margin-left: 3px; }
+
+  .preset-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 16px; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
+  }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; padding: 8px 14px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+  }
+  .preset:hover { border-color: var(--border-hover); color: var(--text); transform: translateY(-1px); }
+  .preset.active { border-color: var(--gold); color: var(--gold); background: var(--gold-faint); }
+  .preset em {
+    color: var(--text-muted); font-style: normal;
+    margin-left: 8px; font-size: 0.9em;
+  }
+  .preset.active em { color: rgba(255,217,77,0.65); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 18px 22px; margin: 24px 0 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+  }
+  .note p { font-size: 0.92em; color: var(--text); line-height: 1.7; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding: 22px 0; border-top: 1px solid var(--border); margin-top: 28px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78em; color: var(--gold); }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 700px) {
+    #sceneCanvas { height: 420px; }
+    .rate-value { font-size: 0.85em; min-width: 90px; }
+    .hud-top { font-size: 0.62em; }
+    .controls { padding: 14px 16px; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-020 / Interactive Technical Diagram</div>
+  <h1>What Slow Motion Actually Is</h1>
+  <div class="subtitle">A mousetrap snaps closed in 5 milliseconds. At 60 fps you see a blur. Drag the lever, raise the frame rate, and watch the bar swing across the base frame by frame. The mechanism is not slower. The camera sampled it denser.</div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <canvas id="sceneCanvas"></canvas>
+    <div class="hud-top">
+      <span id="hudLeft">captured at 5,000 fps</span>
+      <span class="hud-right" id="hudRight">event clock: 0.00 ms</span>
+    </div>
+    <div class="hud-center" id="hudCenter">
+      <div class="factor" id="hudFactor">166×</div>
+      <div class="factor-label">slower than real life</div>
+    </div>
+    <div class="controls">
+      <button class="btn-play" id="btnPlay">Pause</button>
+      <div class="rate-wrap">
+        <span class="rate-label">Frame rate</span>
+        <input type="range" class="rate-slider" id="rateSlider" min="0" max="7" step="1" value="4">
+        <div class="rate-value" id="rateValue">5,000<span class="unit">fps</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="preset-row" id="presetRow">
+    <button class="preset" data-idx="0">60 fps <em>phone camera</em></button>
+    <button class="preset" data-idx="1">240 fps <em>action cam</em></button>
+    <button class="preset" data-idx="2">1,000 fps <em>broadcast HS</em></button>
+    <button class="preset" data-idx="3">2,500 fps</button>
+    <button class="preset active" data-idx="4">5,000 fps <em>lab</em></button>
+    <button class="preset" data-idx="5">10,000 fps</button>
+    <button class="preset" data-idx="6">15,000 fps</button>
+    <button class="preset" data-idx="7">20,000 fps <em>max</em></button>
+  </div>
+
+  <div class="note">
+    <p>Slow motion is not the camera bending time. The camera captures frames faster than it plays them back. Capture 20,000 per second, replay at 30 per second, and a 5 millisecond mousetrap snap plays back over 3.3 seconds. The ratio is the <strong>slow-motion factor</strong>. Capture rate divided by playback rate. A phone at 60 fps plays the same snap back in 10 milliseconds, still a blink. At 20,000 fps you get 666× slower. The spring force is identical. The sampling is what changed.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-020</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Slow Motion Playback</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Single Slider</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-020 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.005;   // 5 ms snap
+  const PLAYBACK_FPS      = 30;
+  const FPS_STEPS         = [60, 240, 1000, 2500, 5000, 10000, 15000, 20000];
+  const PAUSE_BETWEEN_LOOPS = 0.9;
+
+  // ── STATE ──
+  let fpsIdx = 4;
+  let playing = true;
+  let animId = null;
+  let lastWall = 0;
+  let wallElapsed = 0;
+  let inPauseGap = false;
+  let pauseGapT = 0;
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── SCENE: mousetrap source space (scene designed at 640 × 420) ──
+  const SCN_W = 640;
+  const SCN_H = 420;
+  const PIVOT_X = 160;           // pivot near left end of base
+  const PIVOT_Y = 300;           // atop the base
+  const BASE_X = 110;
+  const BASE_Y = 300;
+  const BASE_W = 420;
+  const BASE_H = 34;
+  const BAR_LEN = 340;           // bar length (swings from pivot)
+  const BAR_THICK = 9;
+  const BAIT_X = 500;
+  const BAIT_Y = 295;            // sits on top of base
+
+  // Bar angle as a function of scene-time t in [0,1]
+  // 0 = armed (straight up, pi/2). 0.45 = impact (horizontal, 0). Then a damped overshoot/oscillation.
+  function getBarAngle(t) {
+    const IMPACT = 0.45;
+    if (t < IMPACT) {
+      const u = t / IMPACT;
+      // Constant-torque fall: theta = pi/2 * (1 - u^2)
+      return (Math.PI / 2) * (1 - u * u);
+    }
+    // Post-impact: damped oscillation around a small negative angle (bar pressed slightly below horizontal)
+    const u = (t - IMPACT) / (1 - IMPACT);  // 0..1 after impact
+    const OSC_FREQ = 9;                      // radians
+    const DAMPING = 4.5;
+    return -0.25 * Math.sin(u * OSC_FREQ) * Math.exp(-u * DAMPING);
+  }
+
+  // Compute a few past-angle ghost positions for motion blur at the current t.
+  // motionBlurLen is proportional to (1 / capture fps). At 60 fps: long streaks. At 20k: crisp.
+  function getGhostAngles(t, exposureFraction, nGhosts) {
+    const angles = [];
+    if (exposureFraction <= 0 || nGhosts <= 1) return [getBarAngle(t)];
+    const tStart = Math.max(0, t - exposureFraction);
+    for (let i = 0; i < nGhosts; i++) {
+      const tt = tStart + (i / (nGhosts - 1)) * (t - tStart);
+      angles.push(getBarAngle(tt));
+    }
+    return angles;
+  }
+
+  // Utility: draw bar at a given angle
+  function drawBar(px, py, scale, angle, alpha) {
+    const tipX = px + Math.cos(angle) * BAR_LEN * scale;
+    const tipY = py - Math.sin(angle) * BAR_LEN * scale;
+
+    // Bar body (outer glow + core)
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(-angle);
+    // Outer glow
+    ctx.fillStyle = `rgba(255,217,77,${0.10 * alpha})`;
+    ctx.fillRect(-6 * scale, -BAR_THICK * 1.5 * scale, (BAR_LEN + 12) * scale, BAR_THICK * 3 * scale);
+    // Core metal
+    const grad = ctx.createLinearGradient(0, -BAR_THICK * scale, 0, BAR_THICK * scale);
+    grad.addColorStop(0, `rgba(220,220,226,${alpha})`);
+    grad.addColorStop(0.5, `rgba(255,255,255,${alpha})`);
+    grad.addColorStop(1, `rgba(160,160,170,${alpha})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, -BAR_THICK * 0.5 * scale, BAR_LEN * scale, BAR_THICK * scale);
+    // Edge outline
+    ctx.strokeStyle = `rgba(40,40,46,${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, -BAR_THICK * 0.5 * scale, BAR_LEN * scale, BAR_THICK * scale);
+    // Bar tip cap
+    ctx.beginPath();
+    ctx.arc(BAR_LEN * scale, 0, BAR_THICK * 0.7 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,241,165,${alpha})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSpring(px, py, scale, tension) {
+    // tension: 1 = armed (high), 0 = released (low)
+    // Draw spring as a spiral at the pivot.
+    ctx.save();
+    ctx.translate(px, py);
+    const coils = 5;
+    const baseR = 8 * scale;
+    const maxR = 14 * scale;
+    ctx.strokeStyle = `rgba(255,217,77,${0.45 + 0.35 * tension})`;
+    ctx.lineWidth = Math.max(1.2, 1.6 * scale);
+    ctx.beginPath();
+    for (let i = 0; i <= coils * 40; i++) {
+      const u = i / (coils * 40);
+      const ang = u * coils * Math.PI * 2;
+      const r = baseR + (maxR - baseR) * u * (0.6 + 0.4 * tension);
+      const x = Math.cos(ang) * r;
+      const y = Math.sin(ang) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    // Center pin
+    ctx.beginPath();
+    ctx.arc(0, 0, 4 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1f';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBase(bx, by, scale) {
+    const w = BASE_W * scale;
+    const h = BASE_H * scale;
+    // Wood grain gradient
+    const grad = ctx.createLinearGradient(0, by, 0, by + h);
+    grad.addColorStop(0, '#6a4a2a');
+    grad.addColorStop(0.5, '#5a3e24');
+    grad.addColorStop(1, '#3a2814');
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, w, h);
+    // Top highlight edge
+    ctx.fillStyle = 'rgba(255,217,128,0.08)';
+    ctx.fillRect(bx, by, w, 2);
+    // Shadow under base
+    const shadowGrad = ctx.createLinearGradient(0, by + h, 0, by + h + 30 * scale);
+    shadowGrad.addColorStop(0, 'rgba(0,0,0,0.35)');
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shadowGrad;
+    ctx.fillRect(bx - 10, by + h, w + 20, 30 * scale);
+
+    // Subtle wood grain lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const ly = by + 6 + i * 7;
+      if (ly > by + h - 4) break;
+      ctx.beginPath();
+      ctx.moveTo(bx + 10, ly);
+      ctx.lineTo(bx + w - 10, ly);
+      ctx.stroke();
+    }
+  }
+
+  function drawBait(tx, ty, scale, squashFactor) {
+    // Squash when bar impacts
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.scale(1, 1 - squashFactor * 0.3);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12 * scale, 10 * scale, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#d4a258';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawImpactSpark(ix, iy, scale, t) {
+    const IMPACT = 0.45;
+    if (t < IMPACT || t > IMPACT + 0.08) return;
+    const age = (t - IMPACT) / 0.08;
+    const a = 1 - age;
+    if (a <= 0) return;
+    // Radial spokes
+    const n = 12;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2;
+      const len = (8 + 26 * (1 - a)) * scale;
+      ctx.beginPath();
+      ctx.moveTo(ix, iy);
+      ctx.lineTo(ix + Math.cos(ang) * len, iy + Math.sin(ang) * len * 0.6);
+      ctx.strokeStyle = `rgba(255,241,165,${0.7 * a})`;
+      ctx.lineWidth = Math.max(1, 1.5 * scale);
+      ctx.stroke();
+    }
+    // Flash
+    ctx.beginPath();
+    ctx.arc(ix, iy, 18 * scale * a, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(ix, iy, 0, ix, iy, 18 * scale * a);
+    grad.addColorStop(0, `rgba(255,255,255,${0.7 * a})`);
+    grad.addColorStop(1, 'rgba(255,241,165,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  function drawScene(t) {
+    // Background
+    ctx.clearRect(0, 0, cssW, cssH);
+    const bg = ctx.createLinearGradient(0, 0, 0, cssH);
+    bg.addColorStop(0, '#0c0c10');
+    bg.addColorStop(1, '#060608');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    // Floor hint
+    const floorGrad = ctx.createLinearGradient(0, cssH * 0.82, 0, cssH);
+    floorGrad.addColorStop(0, 'rgba(255,217,77,0.03)');
+    floorGrad.addColorStop(1, 'rgba(255,217,77,0)');
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, cssH * 0.82, cssW, cssH * 0.18);
+
+    // Compute scale & offset so scene fits
+    const scale = Math.min(cssW / SCN_W, cssH / SCN_H);
+    const ox = (cssW - SCN_W * scale) / 2;
+    const oy = (cssH - SCN_H * scale) / 2;
+
+    const px = ox + PIVOT_X * scale;
+    const py = oy + PIVOT_Y * scale;
+    const bx = ox + BASE_X * scale;
+    const by = oy + BASE_Y * scale;
+    const tx = ox + BAIT_X * scale;
+    const ty = oy + BAIT_Y * scale;
+
+    // Base FIRST (behind bar)
+    drawBase(bx, by, scale);
+
+    // Spring tension correlates with armed-ness
+    const angleNow = getBarAngle(t);
+    const tension = Math.max(0, Math.min(1, Math.sin(angleNow))); // 1 when armed, ~0 when closed
+    drawSpring(px, py, scale, tension);
+
+    // Motion blur: at low capture fps, exposure is a larger fraction of scene time,
+    // so the bar smears. We model exposure as ~1 / (fps * PHYSICAL_DURATION), capped.
+    const fps = FPS_STEPS[fpsIdx];
+    const exposureScene = Math.min(0.4, 1 / (fps * PHYSICAL_DURATION));
+    const ghostAngles = getGhostAngles(t, exposureScene, 7);
+
+    // Draw ghosts faded (oldest first)
+    for (let i = 0; i < ghostAngles.length - 1; i++) {
+      const a = (i / (ghostAngles.length - 1)) * 0.4;  // max ghost alpha 0.4
+      drawBar(px, py, scale, ghostAngles[i], a);
+    }
+    // Current bar
+    drawBar(px, py, scale, angleNow, 1.0);
+
+    // Impact spark + bait squash near impact moment
+    const IMPACT = 0.45;
+    let squash = 0;
+    if (t >= IMPACT && t < IMPACT + 0.1) {
+      squash = 1 - (t - IMPACT) / 0.1;
+    }
+    drawBait(tx, ty, scale, squash);
+    drawImpactSpark(tx, ty - 6 * scale, scale, t);
+  }
+
+  // ── MATH ──
+  function getMagnification()   { return FPS_STEPS[fpsIdx] / PLAYBACK_FPS; }
+  function getViewerDuration()  { return PHYSICAL_DURATION * getMagnification(); }
+  function fmtMag(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10)   return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+
+  function updateChrome() {
+    const fps = FPS_STEPS[fpsIdx];
+    document.getElementById('rateValue').innerHTML = `${fps.toLocaleString()}<span class="unit">fps</span>`;
+    document.getElementById('rateSlider').value = fpsIdx;
+    document.getElementById('hudFactor').textContent = fmtMag(getMagnification());
+    document.getElementById('hudLeft').textContent = `captured at ${fps.toLocaleString()} fps`;
+    document.querySelectorAll('.preset').forEach(p => {
+      p.classList.toggle('active', parseInt(p.dataset.idx) === fpsIdx);
+    });
+  }
+
+  function updateHudClock(sceneT) {
+    const ms = (sceneT * PHYSICAL_DURATION * 1000).toFixed(2);
+    document.getElementById('hudRight').textContent = `event clock: ${ms} ms`;
+  }
+
+  function setCenterHud(show) {
+    document.getElementById('hudCenter').classList.toggle('visible', show);
+  }
+
+  // ── ANIMATION ──
+  function animate(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.1);
+    lastWall = time;
+
+    if (playing) {
+      if (inPauseGap) {
+        pauseGapT += dt;
+        if (pauseGapT >= PAUSE_BETWEEN_LOOPS) {
+          inPauseGap = false;
+          pauseGapT = 0;
+          wallElapsed = 0;
+        }
+      } else {
+        wallElapsed += dt;
+        const vd = getViewerDuration();
+        if (wallElapsed >= vd) {
+          wallElapsed = vd;
+          inPauseGap = true;
+          pauseGapT = 0;
+        }
+      }
+    }
+
+    let sceneT;
+    if (inPauseGap) sceneT = 1.0;
+    else sceneT = getViewerDuration() > 0 ? (wallElapsed / getViewerDuration()) : 0;
+    sceneT = Math.max(0, Math.min(1, sceneT));
+
+    drawScene(sceneT);
+    updateHudClock(sceneT);
+    setCenterHud(inPauseGap && pauseGapT > 0.15 && pauseGapT < PAUSE_BETWEEN_LOOPS - 0.15);
+
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastWall = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  function onRateChange(newIdx) {
+    fpsIdx = newIdx;
+    const vdOld = getViewerDuration();
+    const curSceneT = vdOld > 0 ? (wallElapsed / Math.max(0.0001, vdOld)) : 0;
+    updateChrome();
+    wallElapsed = Math.max(0, Math.min(getViewerDuration(), curSceneT * getViewerDuration()));
+  }
+  document.getElementById('rateSlider').addEventListener('input', (e) => onRateChange(parseInt(e.target.value)));
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => onRateChange(parseInt(btn.dataset.idx)));
+  });
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  resize();
+  updateChrome();
+  drawScene(0);
+  window.addEventListener('resize', () => { resize(); });
+})();
+</script>
+</body>
+</html>

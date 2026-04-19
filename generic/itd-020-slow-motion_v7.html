@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-020: What Slow Motion Actually Is</title>
+<meta property="og:title" content="ITD-020: What Slow Motion Actually Is">
+<meta property="og:description" content="A bullet passes through an apple in 5 ms. Pull the lever, change the frame rate, watch it happen.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.7em, 4.5vw, 2.3em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.95em; color: var(--text-dim); max-width: 620px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .stage {
+    position: relative;
+    background: #0a0a0d;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  #sceneCanvas { width: 100%; height: 540px; display: block; background: #0a0a0d; }
+  .stage-controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 16px 20px;
+    background: linear-gradient(to top, rgba(9,9,11,0.96) 40%, rgba(9,9,11,0));
+    display: flex; align-items: center; gap: 14px;
+    z-index: 2;
+  }
+  .btn-play {
+    font-family: 'JetBrains Mono', monospace;
+    border: none; padding: 10px 22px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-weight: 700; font-size: 0.78em; letter-spacing: 0.6px;
+    background: var(--gold); color: var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn-play:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* LEVER PANEL */
+  .lever-panel {
+    position: relative;
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
+  }
+  .lever-panel-label {
+    position: absolute;
+    top: 14px; left: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--gold);
+    z-index: 2;
+    pointer-events: none;
+  }
+  #leverCanvas {
+    width: 100%;
+    height: 260px;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #leverCanvas.grabbing { cursor: grabbing; }
+
+  /* STATS STRIP */
+  .stats-strip {
+    display: grid; grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 12px; margin-top: 16px;
+    padding: 18px 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.55s backwards;
+  }
+  .stat { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+  .stat:first-child { align-items: flex-start; text-align: left; }
+  .stat:last-child { align-items: flex-end; text-align: right; }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--text-muted);
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95em; font-weight: 600;
+    color: var(--text); letter-spacing: -0.3px;
+  }
+  .stat-hero .stat-label { color: var(--gold-dim); }
+  .stat-hero .stat-value {
+    font-size: clamp(1.6em, 3.5vw, 2.4em); font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -1px; line-height: 1;
+  }
+
+  /* PRESETS */
+  .preset-grid-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: var(--gold); margin: 28px 0 12px;
+    display: flex; align-items: center; gap: 12px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+  }
+  .preset-grid-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.65s backwards;
+  }
+  .preset {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 18px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative; overflow: hidden; min-height: 92px;
+  }
+  .preset:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .preset.active {
+    border-color: var(--gold);
+    background: var(--gold-faint);
+    box-shadow: 0 4px 24px rgba(255,217,77,0.12);
+  }
+  .preset.active::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top, rgba(255,217,77,0.06), transparent 70%);
+    pointer-events: none;
+  }
+  .preset-fps {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.45em; font-weight: 700;
+    color: var(--text); letter-spacing: -0.8px; line-height: 1.1;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset-fps .unit {
+    font-size: 0.55em; font-weight: 500;
+    color: var(--text-dim); margin-left: 4px; letter-spacing: 0;
+  }
+  .preset-ctx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 500;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1.2px; margin-top: 8px;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset:hover .preset-fps { color: #fff; }
+  .preset.active .preset-fps { color: var(--gold); }
+  .preset.active .preset-fps .unit { color: rgba(255,217,77,0.55); }
+  .preset.active .preset-ctx { color: rgba(255,217,77,0.75); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 18px 22px; margin: 24px 0 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.7s backwards;
+  }
+  .note p { font-size: 0.92em; color: var(--text); line-height: 1.7; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding: 22px 0; border-top: 1px solid var(--border); margin-top: 28px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78em; color: var(--gold); }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s; }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 900px) {
+    .preset-grid { grid-template-columns: repeat(2, 1fr); }
+    .preset-fps { font-size: 1.3em; }
+  }
+  @media (max-width: 700px) {
+    #sceneCanvas { height: 420px; }
+    #leverCanvas { height: 220px; }
+    .stats-strip { grid-template-columns: 1fr; gap: 14px; padding: 14px 18px; }
+    .stat, .stat:first-child, .stat:last-child { align-items: center; text-align: center; }
+    .preset { min-height: 82px; padding: 14px 10px; }
+    .preset-fps { font-size: 1.2em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-020 / Interactive Technical Diagram</div>
+  <h1>What Slow Motion Actually Is</h1>
+  <div class="subtitle">A bullet passes through an apple in 5 milliseconds. At 60 fps you see a streak. Pull the lever, land on any frame rate from 60 up to 20,000, and watch what was always there.</div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <canvas id="sceneCanvas"></canvas>
+    <div class="stage-controls">
+      <button class="btn-play" id="btnPlay">Pause</button>
+    </div>
+  </div>
+
+  <!-- LEVER PANEL -->
+  <div class="lever-panel">
+    <div class="lever-panel-label">Frame-Rate Lever</div>
+    <canvas id="leverCanvas"></canvas>
+  </div>
+
+  <!-- STATS STRIP -->
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-label">Capture</div>
+      <div class="stat-value" id="statCapture">5,000 fps</div>
+    </div>
+    <div class="stat stat-hero">
+      <div class="stat-label">Slow-Motion Factor</div>
+      <div class="stat-value" id="statFactor">166×</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">5 ms stretches to</div>
+      <div class="stat-value" id="statStretch">0.83 s</div>
+    </div>
+  </div>
+
+  <!-- PRESETS -->
+  <div class="preset-grid-label">Frame Rates</div>
+  <div class="preset-grid" id="presetGrid">
+    <button class="preset" data-fps="60"><span class="preset-fps">60<span class="unit">fps</span></span><span class="preset-ctx">phone camera</span></button>
+    <button class="preset" data-fps="240"><span class="preset-fps">240<span class="unit">fps</span></span><span class="preset-ctx">action cam</span></button>
+    <button class="preset" data-fps="1000"><span class="preset-fps">1,000<span class="unit">fps</span></span><span class="preset-ctx">broadcast</span></button>
+    <button class="preset" data-fps="2500"><span class="preset-fps">2,500<span class="unit">fps</span></span><span class="preset-ctx">industrial</span></button>
+    <button class="preset active" data-fps="5000"><span class="preset-fps">5,000<span class="unit">fps</span></span><span class="preset-ctx">science lab</span></button>
+    <button class="preset" data-fps="10000"><span class="preset-fps">10,000<span class="unit">fps</span></span><span class="preset-ctx">ballistics</span></button>
+    <button class="preset" data-fps="15000"><span class="preset-fps">15,000<span class="unit">fps</span></span><span class="preset-ctx">impact research</span></button>
+    <button class="preset" data-fps="20000"><span class="preset-fps">20,000<span class="unit">fps</span></span><span class="preset-ctx">the ceiling</span></button>
+  </div>
+
+  <div class="note">
+    <p>Slow motion is not the camera bending time. The camera captures frames faster than it plays them back. Capture 20,000 per second, replay at 30, and a 5 millisecond bullet impact plays back over 3.3 seconds. The ratio is the <strong>slow-motion factor</strong>. Capture rate divided by playback rate. A phone at 60 fps plays the same impact back in 10 milliseconds, a streak. At 20,000 fps you get 666× slower, and you can see the bullet mid-apple. The bullet's speed is identical. The sampling is what changed.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-020</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Slow Motion Playback</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Physical Lever</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-020 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.005;
+  const PLAYBACK_FPS = 30;
+  const FPS_MIN = 60;
+  const FPS_MAX = 20000;
+  const PAUSE_BETWEEN_LOOPS = 1.6;  // longer pause so viewer sees the intact apple
+
+  const LOG_RANGE = Math.log(FPS_MAX / FPS_MIN);
+  const LEVER_MIN_ANG = -55 * Math.PI / 180;
+  const LEVER_MAX_ANG =  55 * Math.PI / 180;
+
+  function fpsToAngle(fps) {
+    const u = Math.log(Math.max(FPS_MIN, Math.min(FPS_MAX, fps)) / FPS_MIN) / LOG_RANGE;
+    return LEVER_MIN_ANG + u * (LEVER_MAX_ANG - LEVER_MIN_ANG);
+  }
+  function angleToFps(angle) {
+    const u = (angle - LEVER_MIN_ANG) / (LEVER_MAX_ANG - LEVER_MIN_ANG);
+    return FPS_MIN * Math.exp(u * LOG_RANGE);
+  }
+
+  const TICK_FPS = [60, 240, 1000, 2500, 5000, 10000, 15000, 20000];
+
+  // ── STATE ──
+  let currentFps = 5000;
+  let playing = true;
+  let sceneAnimId = null;
+  let lastWall = 0;
+  let wallElapsed = 0;
+  let inPauseGap = false;
+  let pauseGapT = 0;
+  let dragging = false;
+
+  // ── SCENE CANVAS (bullet-through-apple) ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resizeScene() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  const SCN_W = 640, SCN_H = 420;
+  const CX = 400, CY = 210;
+  const APPLE_RX = 58, APPLE_RY = 62;
+  const BULLET_START_X = 30;
+  const BULLET_SPEED = 1150;
+  const IMPACT_T = (CX - APPLE_RX - BULLET_START_X) / BULLET_SPEED;
+  const EXIT_T   = (CX + APPLE_RX - BULLET_START_X) / BULLET_SPEED;
+  const GRAVITY  = 820;           // strong gravity so particles visibly arc down
+
+  function createRng(seed) {
+    let s = seed;
+    return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  }
+
+  const NUM_PARTICLES = 340;
+  const particles = [];
+  {
+    const rng = createRng(23);
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      const theta = rng() * Math.PI * 2;
+      const r = Math.sqrt(rng());
+      const lx = Math.cos(theta) * r * APPLE_RX;
+      const ly = Math.sin(theta) * r * APPLE_RY;
+      const px = CX + lx, py = CY + ly;
+      const distFromLine = Math.abs(ly);
+      const bulletArrival = (px - BULLET_START_X) / BULLET_SPEED;
+      const releaseT = bulletArrival + (distFromLine / APPLE_RY) * 0.22 + rng() * 0.02;
+      const radialAng = Math.atan2(ly, lx);
+      const closeness = 1 - Math.min(1, distFromLine / APPLE_RY);
+      // Tuned so particles arc visibly under gravity instead of flying off-right.
+      // Horizontal velocity reduced; initial vy gets a small random scatter.
+      const velMag = 180 + closeness * 320;
+      const vx = Math.cos(radialAng) * velMag * 0.45 + 60 + closeness * 120;
+      const vy = Math.sin(radialAng) * velMag * 0.85 + (rng() - 0.5) * 90;
+      const roll = rng();
+      let color;
+      if (roll < 0.55) color = `rgb(${180 + Math.floor(rng()*40)}, ${30 + Math.floor(rng()*30)}, ${30 + Math.floor(rng()*20)})`;
+      else if (roll < 0.85) color = `rgb(${200 + Math.floor(rng()*40)}, ${120 + Math.floor(rng()*40)}, ${90 + Math.floor(rng()*30)})`;
+      else color = `rgb(${220 + Math.floor(rng()*30)}, ${180 + Math.floor(rng()*40)}, ${80 + Math.floor(rng()*30)})`;
+      particles.push({ origX: px, origY: py, vx, vy, releaseT, color, size: 2.2 + rng() * 2.2 });
+    }
+  }
+
+  function drawAppleSolid(alpha) {
+    if (alpha <= 0.02) return;
+    ctx.save();
+    const bodyGrad = ctx.createRadialGradient(CX - 20, CY - 20, 10, CX, CY, APPLE_RX * 1.2);
+    bodyGrad.addColorStop(0, `rgba(230,120,110,${alpha})`);
+    bodyGrad.addColorStop(0.6, `rgba(190,45,45,${alpha})`);
+    bodyGrad.addColorStop(1, `rgba(120,20,25,${alpha})`);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(CX, CY, APPLE_RX, APPLE_RY, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(CX - 22, CY - 24, 16, 22, -0.3, 0, Math.PI * 2);
+    const hl = ctx.createRadialGradient(CX - 22, CY - 24, 2, CX - 22, CY - 24, 22);
+    hl.addColorStop(0, `rgba(255,230,220,${alpha * 0.7})`);
+    hl.addColorStop(1, `rgba(255,230,220,0)`);
+    ctx.fillStyle = hl;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(CX + 12, CY + APPLE_RY * 0.5, APPLE_RX * 0.7, APPLE_RY * 0.3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(60,10,15,${alpha * 0.3})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStemAndLeaf(alpha) {
+    if (alpha <= 0.02) return;
+    ctx.save();
+    ctx.fillStyle = `rgba(80,50,30,${alpha})`;
+    ctx.fillRect(CX - 3, CY - APPLE_RY - 12, 6, 14);
+    ctx.fillStyle = `rgba(70,120,50,${alpha})`;
+    ctx.beginPath();
+    ctx.ellipse(CX + 10, CY - APPLE_RY - 4, 10, 5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(40,80,35,${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CX + 4, CY - APPLE_RY - 6);
+    ctx.lineTo(CX + 18, CY - APPLE_RY - 3);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawParticles(t) {
+    for (const p of particles) {
+      if (t < p.releaseT - 0.03) continue;
+      let x, y, alpha, size = p.size;
+      if (t < p.releaseT) {
+        const u = (t - (p.releaseT - 0.03)) / 0.03;
+        alpha = u;
+        x = p.origX; y = p.origY;
+      } else {
+        const dt = t - p.releaseT;
+        x = p.origX + p.vx * dt;
+        y = p.origY + p.vy * dt + 0.5 * GRAVITY * dt * dt;
+        // Slower fade so particles remain visible through the full fall arc
+        alpha = Math.max(0, 1 - dt * 0.55);
+      }
+      if (alpha <= 0.02) continue;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawImpactFlash(t) {
+    if (t >= IMPACT_T - 0.005 && t < IMPACT_T + 0.04) {
+      const a = 1 - Math.abs(t - (IMPACT_T + 0.01)) / 0.04;
+      if (a > 0) {
+        const ix = CX - APPLE_RX, iy = CY, r = 18 * a;
+        const grad = ctx.createRadialGradient(ix, iy, 0, ix, iy, r * 2);
+        grad.addColorStop(0, `rgba(255,241,165,${0.6 * a})`);
+        grad.addColorStop(1, 'rgba(255,241,165,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ix - r*2, iy - r*2, r*4, r*4);
+      }
+    }
+    if (t >= EXIT_T && t < EXIT_T + 0.12) {
+      const age = (t - EXIT_T) / 0.12;
+      const a = 1 - age;
+      if (a > 0) {
+        const ex = CX + APPLE_RX, ey = CY, r = (24 + 40 * (1 - a));
+        const grad = ctx.createRadialGradient(ex, ey, 0, ex, ey, r);
+        grad.addColorStop(0, `rgba(255,241,165,${0.55 * a})`);
+        grad.addColorStop(0.3, `rgba(255,120,90,${0.3 * a})`);
+        grad.addColorStop(1, 'rgba(255,120,90,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ex - r, ey - r, r*2, r*2);
+        for (let i = 0; i < 10; i++) {
+          const ang = (i / 10 - 0.5) * Math.PI;
+          const len = 10 + 40 * (1 - a);
+          ctx.strokeStyle = `rgba(255,241,165,${0.5 * a})`;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(ex + Math.cos(ang) * len, ey + Math.sin(ang) * len);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function drawBullet(t, fps) {
+    const bulletX = BULLET_START_X + BULLET_SPEED * t;
+    if (bulletX < -20 || bulletX > SCN_W + 60) return;
+    const bulletY = CY;
+    const exposureScene = Math.min(0.4, 1 / (fps * PHYSICAL_DURATION));
+    const streakLen = BULLET_SPEED * exposureScene;
+    const tailX = bulletX - streakLen;
+    const grad = ctx.createLinearGradient(tailX, bulletY, bulletX, bulletY);
+    grad.addColorStop(0, 'rgba(255,217,77,0)');
+    grad.addColorStop(0.6, 'rgba(255,230,120,0.35)');
+    grad.addColorStop(1, 'rgba(255,255,220,0.95)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(tailX, bulletY); ctx.lineTo(bulletX, bulletY); ctx.stroke();
+
+    ctx.save();
+    ctx.translate(bulletX, bulletY);
+    const L = 11, W = 4.5;
+    const mGrad = ctx.createLinearGradient(0, -W, 0, W);
+    mGrad.addColorStop(0, '#fff4bf'); mGrad.addColorStop(0.5, '#ffd94d'); mGrad.addColorStop(1, '#b07a14');
+    ctx.fillStyle = mGrad;
+    ctx.beginPath();
+    ctx.moveTo(-L, -W);
+    ctx.lineTo(L - W, -W);
+    ctx.arc(L - W, 0, W, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(-L, W);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(40,30,10,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(L - W - 0.5, -1, 1.4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,220,0.8)'; ctx.fill();
+    ctx.restore();
+  }
+
+  function drawScene(t) {
+    ctx.clearRect(0, 0, cssW, cssH);
+    const bg = ctx.createRadialGradient(cssW / 2, cssH * 0.45, 20, cssW / 2, cssH * 0.55, cssW * 0.75);
+    bg.addColorStop(0, '#0d0d12');
+    bg.addColorStop(1, '#060608');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    const floorGrad = ctx.createLinearGradient(0, cssH * 0.82, 0, cssH);
+    floorGrad.addColorStop(0, 'rgba(255,217,77,0.03)');
+    floorGrad.addColorStop(1, 'rgba(255,217,77,0)');
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, cssH * 0.82, cssW, cssH * 0.18);
+
+    const scale = Math.min(cssW / SCN_W, cssH / SCN_H);
+    const ox = (cssW - SCN_W * scale) / 2;
+    const oy = (cssH - SCN_H * scale) / 2;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.scale(scale, scale);
+
+    const solidAlpha = Math.max(0, 1 - Math.max(0, (t - IMPACT_T)) / Math.max(0.001, (EXIT_T + 0.05 - IMPACT_T)));
+    const stemAlpha = t < EXIT_T ? 1 : Math.max(0, 1 - (t - EXIT_T) / 0.15);
+    drawAppleSolid(solidAlpha);
+    drawStemAndLeaf(stemAlpha);
+    drawParticles(t);
+    drawImpactFlash(t);
+    drawBullet(t, currentFps);
+
+    ctx.restore();
+  }
+
+  // ── LEVER CANVAS ──
+  const leverCanvas = document.getElementById('leverCanvas');
+  const lctx = leverCanvas.getContext('2d');
+  let lW = 0, lH = 0;
+
+  function resizeLever() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = leverCanvas.getBoundingClientRect();
+    lW = rect.width; lH = rect.height;
+    leverCanvas.width = Math.round(lW * dpr);
+    leverCanvas.height = Math.round(lH * dpr);
+    lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function leverGeometry() {
+    const cx = lW / 2;
+    const cy = lH - 36;
+    const L = Math.min(lH - 86, lW * 0.32);
+    const arcR = L + 22;
+    return { cx, cy, L, arcR };
+  }
+
+  function fmtFpsShort(f) {
+    const r = Math.round(f);
+    if (r >= 1000) return (r / 1000).toFixed(r >= 10000 ? 0 : 1).replace('.0','') + 'k';
+    return r.toString();
+  }
+
+  function drawLever() {
+    lctx.clearRect(0, 0, lW, lH);
+
+    // Panel background
+    const bg = lctx.createLinearGradient(0, 0, 0, lH);
+    bg.addColorStop(0, '#0f0f13');
+    bg.addColorStop(1, '#09090c');
+    lctx.fillStyle = bg;
+    lctx.fillRect(0, 0, lW, lH);
+
+    const { cx, cy, L, arcR } = leverGeometry();
+
+    // Metal base plate at the bottom
+    const plateW = Math.min(lW - 60, 420);
+    const plateX = cx - plateW / 2;
+    const plateY = lH - 54;
+    const plateH = 36;
+    // Shadow
+    lctx.fillStyle = 'rgba(0,0,0,0.45)';
+    lctx.fillRect(plateX + 3, plateY + plateH - 2, plateW - 6, 10);
+    // Plate body
+    const plateGrad = lctx.createLinearGradient(0, plateY, 0, plateY + plateH);
+    plateGrad.addColorStop(0, '#2e2e36');
+    plateGrad.addColorStop(0.5, '#202026');
+    plateGrad.addColorStop(1, '#141418');
+    lctx.fillStyle = plateGrad;
+    lctx.fillRect(plateX, plateY, plateW, plateH);
+    // Top highlight strip
+    lctx.fillStyle = 'rgba(255,255,255,0.06)';
+    lctx.fillRect(plateX, plateY, plateW, 1);
+    lctx.fillStyle = 'rgba(0,0,0,0.4)';
+    lctx.fillRect(plateX, plateY + plateH - 1, plateW, 1);
+    // Rivets
+    lctx.fillStyle = '#404048';
+    for (const px of [plateX + 14, plateX + plateW - 14]) {
+      lctx.beginPath();
+      lctx.arc(px, plateY + plateH / 2, 3, 0, Math.PI * 2);
+      lctx.fill();
+      lctx.beginPath();
+      lctx.arc(px - 1, plateY + plateH / 2 - 1, 1, 0, Math.PI * 2);
+      lctx.fillStyle = 'rgba(255,255,255,0.15)';
+      lctx.fill();
+      lctx.fillStyle = '#404048';
+    }
+
+    // Arc groove (the track the knob sweeps)
+    lctx.beginPath();
+    const startAng = -Math.PI / 2 + LEVER_MIN_ANG;
+    const endAng   = -Math.PI / 2 + LEVER_MAX_ANG;
+    lctx.arc(cx, cy, arcR, startAng, endAng);
+    lctx.strokeStyle = 'rgba(255,217,77,0.08)';
+    lctx.lineWidth = 18;
+    lctx.lineCap = 'butt';
+    lctx.stroke();
+
+    lctx.beginPath();
+    lctx.arc(cx, cy, arcR, startAng, endAng);
+    lctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    lctx.lineWidth = 1;
+    lctx.stroke();
+
+    // Tick marks + labels at preset positions
+    for (const fps of TICK_FPS) {
+      const ang = fpsToAngle(fps);
+      const isNear = Math.abs(currentFps - fps) / fps < 0.04;
+      const dir = Math.sin(ang);   // sign indicates tick side
+      const sinA = Math.sin(ang), cosA = Math.cos(ang);
+      // Rotate vector is (sin(ang), -cos(ang)) since angle is measured clockwise from UP
+      const vx = sinA, vy = -cosA;
+      const innerR = arcR - 10;
+      const outerR = arcR + 12;
+      const ix = cx + vx * innerR, iy = cy + vy * innerR;
+      const ox = cx + vx * outerR, oy = cy + vy * outerR;
+      lctx.strokeStyle = isNear ? 'rgba(255,217,77,0.95)' : 'rgba(255,217,77,0.35)';
+      lctx.lineWidth = isNear ? 2.2 : 1.4;
+      lctx.beginPath();
+      lctx.moveTo(ix, iy); lctx.lineTo(ox, oy);
+      lctx.stroke();
+
+      // Label further out
+      const labelR = arcR + 26;
+      const lx = cx + vx * labelR, ly = cy + vy * labelR;
+      lctx.font = `500 ${isNear ? 11 : 10}px "JetBrains Mono", monospace`;
+      lctx.fillStyle = isNear ? '#ffd94d' : 'rgba(160,160,170,0.6)';
+      lctx.textAlign = 'center';
+      lctx.textBaseline = 'middle';
+      lctx.fillText(fmtFpsShort(fps), lx, ly);
+    }
+
+    // Current angle
+    const angNow = fpsToAngle(currentFps);
+    const vx = Math.sin(angNow), vy = -Math.cos(angNow);
+
+    // Shaft (rotated rectangle)
+    lctx.save();
+    lctx.translate(cx, cy);
+    lctx.rotate(angNow);
+    // Shadow behind shaft
+    lctx.fillStyle = 'rgba(0,0,0,0.35)';
+    lctx.fillRect(-8, -L, 16, L);
+    // Metal shaft
+    const shaftGrad = lctx.createLinearGradient(-6, 0, 6, 0);
+    shaftGrad.addColorStop(0, '#2a2a32');
+    shaftGrad.addColorStop(0.5, '#8a8a95');
+    shaftGrad.addColorStop(1, '#2a2a32');
+    lctx.fillStyle = shaftGrad;
+    lctx.fillRect(-5, -L, 10, L);
+    // Edge outline
+    lctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    lctx.lineWidth = 1;
+    lctx.strokeRect(-5, -L, 10, L);
+    lctx.restore();
+
+    // Pivot cap
+    const pivotR = 14;
+    lctx.beginPath();
+    lctx.arc(cx, cy, pivotR + 2, 0, Math.PI * 2);
+    lctx.fillStyle = 'rgba(0,0,0,0.6)';
+    lctx.fill();
+    const pivotGrad = lctx.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, pivotR);
+    pivotGrad.addColorStop(0, '#555560');
+    pivotGrad.addColorStop(1, '#1a1a20');
+    lctx.fillStyle = pivotGrad;
+    lctx.beginPath();
+    lctx.arc(cx, cy, pivotR, 0, Math.PI * 2);
+    lctx.fill();
+    lctx.strokeStyle = '#0a0a0c';
+    lctx.lineWidth = 1;
+    lctx.stroke();
+    // Center bolt
+    lctx.beginPath();
+    lctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    lctx.fillStyle = '#ffd94d';
+    lctx.fill();
+
+    // Handle/knob at tip
+    const tipX = cx + vx * L;
+    const tipY = cy + vy * L;
+    const knobR = 24;
+    // Outer glow when dragging
+    if (dragging) {
+      const glow = lctx.createRadialGradient(tipX, tipY, knobR, tipX, tipY, knobR + 18);
+      glow.addColorStop(0, 'rgba(255,217,77,0.35)');
+      glow.addColorStop(1, 'rgba(255,217,77,0)');
+      lctx.fillStyle = glow;
+      lctx.beginPath();
+      lctx.arc(tipX, tipY, knobR + 18, 0, Math.PI * 2);
+      lctx.fill();
+    }
+    // Gold ring
+    lctx.beginPath();
+    lctx.arc(tipX, tipY, knobR, 0, Math.PI * 2);
+    const ringGrad = lctx.createRadialGradient(tipX - 8, tipY - 8, 2, tipX, tipY, knobR);
+    ringGrad.addColorStop(0, '#fff1a5');
+    ringGrad.addColorStop(0.5, '#ffd94d');
+    ringGrad.addColorStop(1, '#a07010');
+    lctx.fillStyle = ringGrad;
+    lctx.fill();
+    // Inner rubber
+    lctx.beginPath();
+    lctx.arc(tipX, tipY, knobR - 5, 0, Math.PI * 2);
+    const rubberGrad = lctx.createRadialGradient(tipX - 6, tipY - 6, 2, tipX, tipY, knobR - 5);
+    rubberGrad.addColorStop(0, '#42424c');
+    rubberGrad.addColorStop(1, '#15151a');
+    lctx.fillStyle = rubberGrad;
+    lctx.fill();
+    // Highlight dot
+    lctx.beginPath();
+    lctx.arc(tipX - 7, tipY - 7, 3.5, 0, Math.PI * 2);
+    lctx.fillStyle = 'rgba(255,255,255,0.5)';
+    lctx.fill();
+
+    // Current fps badge above knob
+    const badge = `${Math.round(currentFps).toLocaleString()} fps`;
+    lctx.font = `600 13px "JetBrains Mono", monospace`;
+    const metrics = lctx.measureText(badge);
+    const bw = metrics.width + 18;
+    const bh = 24;
+    const bx = tipX - bw / 2;
+    const by = tipY - knobR - bh - 8;
+    // Clamp badge inside panel
+    const bxClamped = Math.max(8, Math.min(lW - bw - 8, bx));
+    lctx.fillStyle = 'rgba(9,9,11,0.9)';
+    lctx.strokeStyle = 'rgba(255,217,77,0.55)';
+    lctx.lineWidth = 1;
+    lctx.beginPath();
+    if (lctx.roundRect) lctx.roundRect(bxClamped, by, bw, bh, 6);
+    else lctx.rect(bxClamped, by, bw, bh);
+    lctx.fill();
+    lctx.stroke();
+    lctx.fillStyle = '#ffd94d';
+    lctx.textAlign = 'center';
+    lctx.textBaseline = 'middle';
+    lctx.fillText(badge, bxClamped + bw / 2, by + bh / 2);
+  }
+
+  // ── MATH ──
+  function getMagnification()  { return currentFps / PLAYBACK_FPS; }
+  function getViewerDuration() { return PHYSICAL_DURATION * getMagnification(); }
+  function fmtMag(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10)   return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+  function fmtDur(s) {
+    if (s >= 1)     return s.toFixed(2) + ' s';
+    if (s >= 0.001) return (s * 1000).toFixed(1) + ' ms';
+    return (s * 1e6).toFixed(0) + ' μs';
+  }
+
+  function updateChrome() {
+    document.getElementById('statCapture').textContent = `${Math.round(currentFps).toLocaleString()} fps`;
+    document.getElementById('statFactor').textContent = fmtMag(getMagnification());
+    document.getElementById('statStretch').textContent = fmtDur(getViewerDuration());
+    document.querySelectorAll('.preset').forEach(p => {
+      const pf = parseInt(p.dataset.fps);
+      const ratio = currentFps / pf;
+      p.classList.toggle('active', ratio > 0.97 && ratio < 1.03);
+    });
+    drawLever();
+  }
+
+  // ── SCENE ANIMATION LOOP ──
+  function animateScene(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.1);
+    lastWall = time;
+
+    if (playing) {
+      if (inPauseGap) {
+        pauseGapT += dt;
+        if (pauseGapT >= PAUSE_BETWEEN_LOOPS) {
+          inPauseGap = false; pauseGapT = 0; wallElapsed = 0;
+        }
+      } else {
+        wallElapsed += dt;
+        const vd = getViewerDuration();
+        if (wallElapsed >= vd) {
+          wallElapsed = vd; inPauseGap = true; pauseGapT = 0;
+        }
+      }
+    }
+    let sceneT;
+    // During the pause gap, rest on the INTACT apple (t=0), not the exploded state (t=1)
+    if (inPauseGap) sceneT = 0.0;
+    else sceneT = getViewerDuration() > 0 ? (wallElapsed / getViewerDuration()) : 0;
+    sceneT = Math.max(0, Math.min(1, sceneT));
+    drawScene(sceneT);
+    sceneAnimId = requestAnimationFrame(animateScene);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!sceneAnimId) { lastWall = 0; sceneAnimId = requestAnimationFrame(animateScene); }
+      } else {
+        if (sceneAnimId) { cancelAnimationFrame(sceneAnimId); sceneAnimId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  function setFps(newFps) {
+    const vdOld = getViewerDuration();
+    const curSceneT = vdOld > 0 ? (wallElapsed / Math.max(0.0001, vdOld)) : 0;
+    currentFps = Math.max(FPS_MIN, Math.min(FPS_MAX, newFps));
+    updateChrome();
+    wallElapsed = Math.max(0, Math.min(getViewerDuration(), curSceneT * getViewerDuration()));
+  }
+
+  // Lever interaction
+  function leverAngleFromPoint(mx, my) {
+    const { cx, cy } = leverGeometry();
+    const dx = mx - cx;
+    const dy = cy - my; // up is positive
+    // atan2(dx, dy) → angle measured clockwise from UP
+    let angle = Math.atan2(dx, dy);
+    return Math.max(LEVER_MIN_ANG, Math.min(LEVER_MAX_ANG, angle));
+  }
+
+  function getLeverMouse(e) {
+    const rect = leverCanvas.getBoundingClientRect();
+    if (e.touches && e.touches[0]) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function onLeverDown(e) {
+    dragging = true;
+    leverCanvas.classList.add('grabbing');
+    const { x, y } = getLeverMouse(e);
+    const ang = leverAngleFromPoint(x, y);
+    setFps(angleToFps(ang));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onLeverMove(e) {
+    if (!dragging) return;
+    const { x, y } = getLeverMouse(e);
+    const ang = leverAngleFromPoint(x, y);
+    setFps(angleToFps(ang));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onLeverUp() {
+    dragging = false;
+    leverCanvas.classList.remove('grabbing');
+    drawLever();
+  }
+  leverCanvas.addEventListener('mousedown', onLeverDown);
+  window.addEventListener('mousemove', onLeverMove);
+  window.addEventListener('mouseup', onLeverUp);
+  leverCanvas.addEventListener('touchstart', onLeverDown, { passive: false });
+  window.addEventListener('touchmove', onLeverMove, { passive: false });
+  window.addEventListener('touchend', onLeverUp);
+
+  // Presets snap the lever
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => setFps(parseInt(btn.dataset.fps)));
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  // ── INIT ──
+  function resizeAll() {
+    resizeScene();
+    resizeLever();
+    drawLever();
+  }
+  resizeAll();
+  updateChrome();
+  drawScene(0);
+  window.addEventListener('resize', resizeAll);
+})();
+</script>
+</body>
+</html>

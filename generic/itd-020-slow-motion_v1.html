@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-020: What Slow Motion Actually Is</title>
+<meta property="og:title" content="ITD-020: What Slow Motion Actually Is">
+<meta property="og:description" content="A spark lasts 5 ms. At 60 fps you see a flicker. At 20,000 fps you watch it form.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.7em, 4.5vw, 2.3em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.95em; color: var(--text-dim); max-width: 620px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .stage {
+    position: relative;
+    background: #040405;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  #sceneCanvas {
+    width: 100%; height: 540px;
+    display: block; background: #040405;
+  }
+
+  /* HUD overlays on the canvas */
+  .hud-top {
+    position: absolute; top: 18px; left: 20px; right: 20px;
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-dim);
+    pointer-events: none;
+    letter-spacing: 0.5px;
+  }
+  .hud-top .hud-right { color: var(--gold); }
+  .hud-center {
+    position: absolute; left: 50%; top: 52%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    text-align: center;
+    opacity: 0; transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hud-center.visible { opacity: 1; }
+  .hud-center .factor {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(2em, 6vw, 4em);
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .hud-center .factor-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* CONTROL BAR pinned to bottom of stage */
+  .controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 18px 24px;
+    background: linear-gradient(to top, rgba(9,9,11,0.95) 40%, rgba(9,9,11,0));
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    z-index: 2;
+  }
+  .btn-play {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.78em;
+    letter-spacing: 0.6px;
+    background: var(--gold); color: var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn-play:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .rate-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 240px;
+  }
+  .rate-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .rate-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    outline: none;
+  }
+  .rate-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--gold); cursor: pointer; border: 3px solid var(--bg);
+    box-shadow: 0 0 10px var(--gold-glow);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .rate-slider::-webkit-slider-thumb:hover { transform: scale(1.1); box-shadow: 0 0 18px var(--gold); }
+  .rate-slider::-moz-range-track { background: var(--border-hover); height: 4px; border: none; border-radius: 2px; }
+  .rate-slider::-moz-range-thumb { background: var(--gold); border: none; width: 18px; height: 18px; border-radius: 50%; cursor: pointer; }
+  .rate-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--gold);
+    min-width: 120px;
+    text-align: right;
+    letter-spacing: -0.3px;
+  }
+  .rate-value .unit {
+    font-size: 0.6em; color: var(--text-dim); font-weight: 400; margin-left: 3px;
+  }
+
+  /* PRESET CHIPS row, below stage */
+  .preset-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 16px; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
+  }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+  }
+  .preset:hover { border-color: var(--border-hover); color: var(--text); transform: translateY(-1px); }
+  .preset.active { border-color: var(--gold); color: var(--gold); background: var(--gold-faint); }
+  .preset em {
+    color: var(--text-muted);
+    font-style: normal;
+    margin-left: 8px;
+    font-size: 0.9em;
+  }
+  .preset.active em { color: rgba(255,217,77,0.65); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 18px 22px;
+    margin: 24px 0 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+  }
+  .note p { font-size: 0.92em; color: var(--text); line-height: 1.7; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding: 22px 0; border-top: 1px solid var(--border); margin-top: 28px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em; color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 700px) {
+    #sceneCanvas { height: 420px; }
+    .rate-value { font-size: 0.85em; min-width: 90px; }
+    .hud-top { font-size: 0.62em; }
+    .controls { padding: 14px 16px; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-020 / Interactive Technical Diagram</div>
+  <h1>What Slow Motion Actually Is</h1>
+  <div class="subtitle">A spark jumps the gap in 5 milliseconds. Your eye catches a flicker. Raise the frame rate and the same 5 ms stretches into a viewable event. The spark is not slower. The camera sampled it denser.</div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <canvas id="sceneCanvas"></canvas>
+    <div class="hud-top">
+      <span id="hudLeft">captured at 5,000 fps</span>
+      <span class="hud-right" id="hudRight">event clock: 0.00 ms</span>
+    </div>
+    <div class="hud-center" id="hudCenter">
+      <div class="factor" id="hudFactor">166×</div>
+      <div class="factor-label">slower than real life</div>
+    </div>
+    <div class="controls">
+      <button class="btn-play" id="btnPlay">Pause</button>
+      <div class="rate-wrap">
+        <span class="rate-label">Frame rate</span>
+        <input type="range" class="rate-slider" id="rateSlider" min="0" max="7" step="1" value="4">
+        <div class="rate-value" id="rateValue">5,000<span class="unit">fps</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRESETS -->
+  <div class="preset-row" id="presetRow">
+    <button class="preset" data-idx="0">60 fps <em>phone camera</em></button>
+    <button class="preset" data-idx="1">240 fps <em>action cam</em></button>
+    <button class="preset" data-idx="2">1,000 fps <em>broadcast HS</em></button>
+    <button class="preset" data-idx="3">2,500 fps</button>
+    <button class="preset active" data-idx="4">5,000 fps <em>lab</em></button>
+    <button class="preset" data-idx="5">10,000 fps</button>
+    <button class="preset" data-idx="6">15,000 fps</button>
+    <button class="preset" data-idx="7">20,000 fps <em>max</em></button>
+  </div>
+
+  <div class="note">
+    <p>Slow motion is not the camera bending time. The camera captures frames faster than it plays them back. Capture 20,000 per second, replay at 30 per second, and a 5 millisecond spark plays back over 3 seconds. The ratio is the <strong>slow-motion factor</strong>. It is simply capture rate divided by playback rate. A phone at 60 fps plays back the same spark in 10 milliseconds, which is still a blink. At 20,000 fps you get 666× slower. The event is identical. The sampling is what changed.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-020</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Slow Motion Playback</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Single Slider</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-020 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.005;   // 5 ms physical event
+  const PLAYBACK_FPS      = 30;
+  const FPS_STEPS         = [60, 240, 1000, 2500, 5000, 10000, 15000, 20000];
+  const PAUSE_BETWEEN_LOOPS = 0.9;   // seconds of dark between loops
+
+  // ── STATE ──
+  let fpsIdx = 4;
+  let playing = true;
+  let animId = null;
+  let lastWall = 0;
+  let wallElapsed = 0;   // seconds since event start (wall time)
+  let inPauseGap = false;
+  let pauseGapT = 0;
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── ARC SCENE ──
+  const ARC_SRC_W = 400;
+  const ARC_SRC_H = 280;
+
+  function createRng(seed) {
+    let s = seed;
+    return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  }
+  function fractalPath(rng, x1, y1, x2, y2, disp, detail) {
+    let points = [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+    let d = disp;
+    for (let iter = 0; iter < detail; iter++) {
+      const next = [];
+      for (let j = 0; j < points.length - 1; j++) {
+        const p1 = points[j], p2 = points[j + 1];
+        next.push(p1);
+        const mx = (p1.x + p2.x) / 2 + (rng() - 0.5) * d;
+        const my = (p1.y + p2.y) / 2 + (rng() - 0.5) * d * 0.25;
+        next.push({ x: mx, y: my });
+      }
+      next.push(points[points.length - 1]);
+      points = next;
+      d *= 0.55;
+    }
+    return points;
+  }
+  function pointsToSegments(points, startT, endT) {
+    const segs = [];
+    const n = points.length - 1;
+    for (let i = 0; i < n; i++) {
+      const frac = i / Math.max(1, n - 1);
+      segs.push({ p1: points[i], p2: points[i + 1], formTime: startT + frac * (endT - startT) });
+    }
+    return segs;
+  }
+  function generateArc() {
+    const rng = createRng(42);
+    const xTop = ARC_SRC_W / 2, xBot = ARC_SRC_W / 2 + 12;
+    const yTop = 28, yBot = ARC_SRC_H - 28;
+    const mainPts = fractalPath(rng, xTop, yTop, xBot, yBot, 140, 5);
+    const segments = pointsToSegments(mainPts, 0.0, 0.55);
+    const NUM_BRANCHES = 6;
+    for (let b = 0; b < NUM_BRANCHES; b++) {
+      const startIdx = Math.floor(4 + rng() * (mainPts.length - 10));
+      const startP = mainPts[startIdx];
+      const side = rng() < 0.5 ? -1 : 1;
+      const angle = side * (Math.PI * 0.25 + rng() * Math.PI * 0.25);
+      const length = 50 + rng() * 80;
+      const endX = startP.x + Math.cos(angle) * length * side * -1;
+      const endY = startP.y + Math.abs(Math.sin(angle)) * length;
+      const branchStartT = Math.min(0.55, (startIdx / mainPts.length) * 0.55 + 0.02);
+      const branchEndT = Math.min(0.6, branchStartT + 0.05);
+      const branchPts = fractalPath(rng, startP.x, startP.y, endX, endY, 34, 3);
+      const bSegs = pointsToSegments(branchPts, branchStartT, branchEndT);
+      for (const s of bSegs) segments.push(s);
+    }
+    return segments;
+  }
+  const arcSegments = generateArc();
+
+  function phaseBrightness(t) {
+    if (t < 0.6) return Math.min(1, t / 0.4);
+    if (t < 0.78) return 1;
+    if (t < 1.0) return Math.max(0, 1 - (t - 0.78) / 0.22);
+    return 0;
+  }
+
+  function drawElectrodes(rx, ry, scale) {
+    // Top
+    ctx.fillStyle = '#2a2a30';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 40) * scale, ry - 4, 80 * scale, 28 * scale);
+    ctx.fillStyle = '#1a1a1f';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 40) * scale, ry + 20 * scale, 80 * scale, 6 * scale);
+    // Bottom
+    ctx.fillStyle = '#2a2a30';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 40) * scale, ry + (ARC_SRC_H - 24) * scale, 80 * scale, 28 * scale);
+    ctx.fillStyle = '#1a1a1f';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 40) * scale, ry + (ARC_SRC_H - 30) * scale, 80 * scale, 6 * scale);
+  }
+
+  function drawArc(rect, t) {
+    const scale = Math.min(rect.w / ARC_SRC_W, rect.h / ARC_SRC_H);
+    const rx = rect.x + (rect.w - ARC_SRC_W * scale) / 2;
+    const ry = rect.y + (rect.h - ARC_SRC_H * scale) / 2;
+
+    drawElectrodes(rx, ry, scale);
+    const overall = phaseBrightness(t);
+    if (overall <= 0) return;
+
+    // Corona
+    if (overall > 0.25) {
+      const cx = rx + ARC_SRC_W * scale / 2;
+      const cy = ry + ARC_SRC_H * scale / 2;
+      const rad = 110 * scale * overall;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      grad.addColorStop(0, `rgba(255,241,165,${0.15 * overall})`);
+      grad.addColorStop(1, 'rgba(255,241,165,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(rx - 40, ry - 40, ARC_SRC_W * scale + 80, ARC_SRC_H * scale + 80);
+    }
+
+    ctx.lineCap = 'round';
+    // Outer glow
+    for (const seg of arcSegments) {
+      if (t < seg.formTime) continue;
+      const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+      const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+      ctx.strokeStyle = `rgba(255,217,77,${0.22 * overall})`;
+      ctx.lineWidth = Math.max(4, 11 * scale);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    // Mid
+    for (const seg of arcSegments) {
+      if (t < seg.formTime) continue;
+      const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+      const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+      ctx.strokeStyle = `rgba(255,241,165,${0.75 * overall})`;
+      ctx.lineWidth = Math.max(1.8, 4 * scale);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    // Core
+    for (const seg of arcSegments) {
+      if (t < seg.formTime) continue;
+      const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+      const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+      ctx.strokeStyle = `rgba(255,255,255,${0.95 * overall})`;
+      ctx.lineWidth = Math.max(1.1, 1.9 * scale);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+
+    // Leader tip spark
+    for (const seg of arcSegments) {
+      const age = t - seg.formTime;
+      if (age > 0 && age < 0.04) {
+        const x = rx + seg.p2.x * scale;
+        const y = ry + seg.p2.y * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(2.2, 5 * scale), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.85 * (1 - age / 0.04)})`;
+        ctx.fill();
+      }
+    }
+
+    // Impact flash at peak
+    if (t >= 0.6 && t < 0.85) {
+      const flashA = 1 - Math.abs(t - 0.72) / 0.13;
+      if (flashA > 0) {
+        const fx = rx + (ARC_SRC_W / 2 + 12) * scale;
+        const fy = ry + (ARC_SRC_H - 28) * scale;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 44 * scale * flashA, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,241,165,${0.45 * flashA})`;
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawFrame(t) {
+    ctx.clearRect(0, 0, cssW, cssH);
+    // Background
+    const bg = ctx.createRadialGradient(cssW / 2, cssH / 2, 20, cssW / 2, cssH / 2, cssW * 0.75);
+    bg.addColorStop(0, '#07070a');
+    bg.addColorStop(1, '#040406');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+    drawArc({ x: 0, y: 0, w: cssW, h: cssH }, t);
+  }
+
+  // ── MATH ──
+  function getMagnification()   { return FPS_STEPS[fpsIdx] / PLAYBACK_FPS; }
+  function getViewerDuration()  { return PHYSICAL_DURATION * getMagnification(); }
+
+  function fmtMag(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10)   return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+
+  // ── UI ──
+  function updateChrome() {
+    const fps = FPS_STEPS[fpsIdx];
+    document.getElementById('rateValue').innerHTML = `${fps.toLocaleString()}<span class="unit">fps</span>`;
+    document.getElementById('rateSlider').value = fpsIdx;
+    document.getElementById('hudFactor').textContent = fmtMag(getMagnification());
+    document.getElementById('hudLeft').textContent = `captured at ${fps.toLocaleString()} fps`;
+    document.querySelectorAll('.preset').forEach(p => {
+      p.classList.toggle('active', parseInt(p.dataset.idx) === fpsIdx);
+    });
+  }
+
+  function updateHudClock(sceneT) {
+    const ms = (sceneT * PHYSICAL_DURATION * 1000).toFixed(2);
+    document.getElementById('hudRight').textContent = `event clock: ${ms} ms`;
+  }
+
+  function setCenterHud(showFactor) {
+    const el = document.getElementById('hudCenter');
+    el.classList.toggle('visible', showFactor);
+  }
+
+  // ── ANIMATION ──
+  function animate(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.1);
+    lastWall = time;
+
+    if (playing) {
+      if (inPauseGap) {
+        pauseGapT += dt;
+        if (pauseGapT >= PAUSE_BETWEEN_LOOPS) {
+          inPauseGap = false;
+          pauseGapT = 0;
+          wallElapsed = 0;
+        }
+      } else {
+        wallElapsed += dt;
+        const vd = getViewerDuration();
+        if (wallElapsed >= vd) {
+          wallElapsed = vd;
+          inPauseGap = true;
+          pauseGapT = 0;
+        }
+      }
+    }
+
+    // Scene time
+    let sceneT;
+    if (inPauseGap) {
+      sceneT = 1.0;
+    } else {
+      sceneT = getViewerDuration() > 0 ? (wallElapsed / getViewerDuration()) : 0;
+    }
+    sceneT = Math.max(0, Math.min(1, sceneT));
+
+    drawFrame(sceneT);
+    updateHudClock(sceneT);
+    // Show central "x slower" tag briefly when in gap
+    setCenterHud(inPauseGap && pauseGapT > 0.15 && pauseGapT < PAUSE_BETWEEN_LOOPS - 0.15);
+
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastWall = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  function onRateChange(newIdx) {
+    fpsIdx = newIdx;
+    // Keep same sceneT (same physical-time position) when rate changes
+    const curSceneT = getViewerDuration() > 0 ? (wallElapsed / Math.max(0.0001, getViewerDuration())) : 0;
+    updateChrome();
+    wallElapsed = Math.max(0, Math.min(getViewerDuration(), curSceneT * getViewerDuration()));
+  }
+  document.getElementById('rateSlider').addEventListener('input', (e) => onRateChange(parseInt(e.target.value)));
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => onRateChange(parseInt(btn.dataset.idx)));
+  });
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  // ── INIT ──
+  resize();
+  updateChrome();
+  drawFrame(0);
+  window.addEventListener('resize', () => { resize(); });
+})();
+</script>
+</body>
+</html>

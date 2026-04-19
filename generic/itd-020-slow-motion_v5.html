@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-020: What Slow Motion Actually Is</title>
+<meta property="og:title" content="ITD-020: What Slow Motion Actually Is">
+<meta property="og:description" content="A bullet passes through an apple in 5 ms. Drag the lever and watch it happen.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.7em, 4.5vw, 2.3em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.95em; color: var(--text-dim); max-width: 620px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .stage {
+    position: relative;
+    background: #0a0a0d;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  #sceneCanvas { width: 100%; height: 540px; display: block; background: #0a0a0d; }
+
+  .controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 18px 24px;
+    background: linear-gradient(to top, rgba(9,9,11,0.96) 40%, rgba(9,9,11,0));
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    z-index: 2;
+  }
+  .btn-play {
+    font-family: 'JetBrains Mono', monospace;
+    border: none; padding: 10px 22px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-weight: 700; font-size: 0.78em; letter-spacing: 0.6px;
+    background: var(--gold); color: var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn-play:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .rate-wrap { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 240px; }
+  .rate-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); white-space: nowrap;
+  }
+  .rate-slider {
+    flex: 1; -webkit-appearance: none;
+    height: 6px; background: var(--surface-raised); border-radius: 3px; outline: none;
+    position: relative;
+  }
+  .rate-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--gold); cursor: grab; border: 3px solid var(--bg);
+    box-shadow: 0 0 14px var(--gold-glow), 0 0 0 1px var(--gold-dim);
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s;
+  }
+  .rate-slider::-webkit-slider-thumb:hover { transform: scale(1.12); box-shadow: 0 0 22px var(--gold); }
+  .rate-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.2); }
+  .rate-slider::-moz-range-track { background: var(--border-hover); height: 6px; border: none; border-radius: 3px; }
+  .rate-slider::-moz-range-thumb {
+    background: var(--gold); border: 3px solid var(--bg);
+    width: 22px; height: 22px; border-radius: 50%; cursor: grab;
+    box-shadow: 0 0 14px var(--gold-glow);
+  }
+  .rate-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1em; font-weight: 700; color: var(--gold);
+    min-width: 115px; text-align: right; letter-spacing: -0.3px;
+  }
+  .rate-value .unit { font-size: 0.6em; color: var(--text-dim); font-weight: 400; margin-left: 3px; }
+
+  .stats-strip {
+    display: grid; grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 12px; margin-top: 16px;
+    padding: 18px 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
+  }
+  .stat { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+  .stat:first-child { align-items: flex-start; text-align: left; }
+  .stat:last-child { align-items: flex-end; text-align: right; }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--text-muted);
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95em; font-weight: 600;
+    color: var(--text); letter-spacing: -0.3px;
+  }
+  .stat-hero .stat-label { color: var(--gold-dim); }
+  .stat-hero .stat-value {
+    font-size: clamp(1.6em, 3.5vw, 2.4em); font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -1px; line-height: 1;
+  }
+
+  .preset-grid-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: var(--gold); margin: 28px 0 12px;
+    display: flex; align-items: center; gap: 12px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.55s backwards;
+  }
+  .preset-grid-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
+
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+  }
+  .preset {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 18px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative; overflow: hidden; min-height: 92px;
+  }
+  .preset:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .preset.active {
+    border-color: var(--gold);
+    background: var(--gold-faint);
+    box-shadow: 0 4px 24px rgba(255,217,77,0.12);
+  }
+  .preset.active::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top, rgba(255,217,77,0.06), transparent 70%);
+    pointer-events: none;
+  }
+  .preset-fps {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.45em; font-weight: 700;
+    color: var(--text); letter-spacing: -0.8px; line-height: 1.1;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset-fps .unit {
+    font-size: 0.55em; font-weight: 500;
+    color: var(--text-dim); margin-left: 4px; letter-spacing: 0;
+  }
+  .preset-ctx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 500;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1.2px; margin-top: 8px;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset:hover .preset-fps { color: #fff; }
+  .preset.active .preset-fps { color: var(--gold); }
+  .preset.active .preset-fps .unit { color: rgba(255,217,77,0.55); }
+  .preset.active .preset-ctx { color: rgba(255,217,77,0.75); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 18px 22px; margin: 24px 0 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.7s backwards;
+  }
+  .note p { font-size: 0.92em; color: var(--text); line-height: 1.7; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding: 22px 0; border-top: 1px solid var(--border); margin-top: 28px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78em; color: var(--gold); }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s; }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 900px) {
+    .preset-grid { grid-template-columns: repeat(2, 1fr); }
+    .preset-fps { font-size: 1.3em; }
+  }
+  @media (max-width: 700px) {
+    #sceneCanvas { height: 420px; }
+    .rate-value { font-size: 0.85em; min-width: 90px; }
+    .controls { padding: 14px 16px; gap: 12px; }
+    .stats-strip { grid-template-columns: 1fr; gap: 14px; padding: 14px 18px; }
+    .stat, .stat:first-child, .stat:last-child { align-items: center; text-align: center; }
+    .preset { min-height: 82px; padding: 14px 10px; }
+    .preset-fps { font-size: 1.2em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-020 / Interactive Technical Diagram</div>
+  <h1>What Slow Motion Actually Is</h1>
+  <div class="subtitle">A bullet passes through an apple in 5 milliseconds. At 60 fps you see a streak and a mess. Drag the lever to any frame rate between 60 and 20,000. The bullet slows, the apple ruptures in visible pieces, and you watch what was always there.</div>
+
+  <div class="stage">
+    <canvas id="sceneCanvas"></canvas>
+    <div class="controls">
+      <button class="btn-play" id="btnPlay">Pause</button>
+      <div class="rate-wrap">
+        <span class="rate-label">Frame rate</span>
+        <input type="range" class="rate-slider" id="rateSlider" min="0" max="1000" step="1" value="732">
+        <div class="rate-value" id="rateValue">5,000<span class="unit">fps</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-label">Capture</div>
+      <div class="stat-value" id="statCapture">5,000 fps</div>
+    </div>
+    <div class="stat stat-hero">
+      <div class="stat-label">Slow-Motion Factor</div>
+      <div class="stat-value" id="statFactor">166×</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">5 ms stretches to</div>
+      <div class="stat-value" id="statStretch">0.83 s</div>
+    </div>
+  </div>
+
+  <div class="preset-grid-label">Frame Rates</div>
+  <div class="preset-grid" id="presetGrid">
+    <button class="preset" data-fps="60"><span class="preset-fps">60<span class="unit">fps</span></span><span class="preset-ctx">phone camera</span></button>
+    <button class="preset" data-fps="240"><span class="preset-fps">240<span class="unit">fps</span></span><span class="preset-ctx">action cam</span></button>
+    <button class="preset" data-fps="1000"><span class="preset-fps">1,000<span class="unit">fps</span></span><span class="preset-ctx">broadcast</span></button>
+    <button class="preset" data-fps="2500"><span class="preset-fps">2,500<span class="unit">fps</span></span><span class="preset-ctx">industrial</span></button>
+    <button class="preset active" data-fps="5000"><span class="preset-fps">5,000<span class="unit">fps</span></span><span class="preset-ctx">science lab</span></button>
+    <button class="preset" data-fps="10000"><span class="preset-fps">10,000<span class="unit">fps</span></span><span class="preset-ctx">ballistics</span></button>
+    <button class="preset" data-fps="15000"><span class="preset-fps">15,000<span class="unit">fps</span></span><span class="preset-ctx">impact research</span></button>
+    <button class="preset" data-fps="20000"><span class="preset-fps">20,000<span class="unit">fps</span></span><span class="preset-ctx">the ceiling</span></button>
+  </div>
+
+  <div class="note">
+    <p>Slow motion is not the camera bending time. The camera captures frames faster than it plays them back. Capture 20,000 per second, replay at 30, and a 5 millisecond bullet impact plays back over 3.3 seconds. The ratio is the <strong>slow-motion factor</strong>. Capture rate divided by playback rate. A phone at 60 fps plays the same impact back in 10 milliseconds, a streak. At 20,000 fps you get 666× slower, and you can see the bullet mid-apple. The bullet's speed is identical. The sampling is what changed.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-020</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Slow Motion Playback</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Continuous Slider</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-020 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.005;
+  const PLAYBACK_FPS = 30;
+  const FPS_MIN = 60;
+  const FPS_MAX = 20000;
+  const SLIDER_RES = 1000;   // slider range 0..1000
+  const PAUSE_BETWEEN_LOOPS = 1.0;
+
+  // ── CONTINUOUS SLIDER MATH (log mapping) ──
+  const LOG_RANGE = Math.log(FPS_MAX / FPS_MIN);
+  function sliderToFps(v) {
+    return FPS_MIN * Math.exp((v / SLIDER_RES) * LOG_RANGE);
+  }
+  function fpsToSlider(f) {
+    return Math.round(SLIDER_RES * Math.log(f / FPS_MIN) / LOG_RANGE);
+  }
+
+  // ── STATE ──
+  let currentFps = 5000;
+  let playing = true;
+  let animId = null;
+  let lastWall = 0;
+  let wallElapsed = 0;
+  let inPauseGap = false;
+  let pauseGapT = 0;
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── SCENE: bullet-through-apple (source-space 640 × 420) ──
+  const SCN_W = 640;
+  const SCN_H = 420;
+  const CX = 400;
+  const CY = 210;
+  const APPLE_RX = 58;
+  const APPLE_RY = 62;
+  const BULLET_START_X = 30;
+  const BULLET_SPEED = 1150;   // px per unit scene-t
+  const IMPACT_T = (CX - APPLE_RX - BULLET_START_X) / BULLET_SPEED;  // ~0.27
+  const EXIT_T   = (CX + APPLE_RX - BULLET_START_X) / BULLET_SPEED;  // ~0.37
+  const GRAVITY  = 220; // px per scene-t^2
+
+  // Seeded random for stable apple
+  function createRng(seed) {
+    let s = seed;
+    return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  }
+
+  // Generate particles uniformly inside apple ellipse
+  const NUM_PARTICLES = 340;
+  const particles = [];
+  {
+    const rng = createRng(23);
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      // Uniform in ellipse via rejection? Use polar with sqrt radius.
+      const theta = rng() * Math.PI * 2;
+      const r = Math.sqrt(rng());
+      const lx = Math.cos(theta) * r * APPLE_RX;
+      const ly = Math.sin(theta) * r * APPLE_RY;
+      const px = CX + lx;
+      const py = CY + ly;
+      const distFromLine = Math.abs(ly);
+
+      // Time bullet arrives at this x
+      const bulletArrival = (px - BULLET_START_X) / BULLET_SPEED;
+      // Release delayed by radial distance from bullet line
+      const releaseT = bulletArrival + (distFromLine / APPLE_RY) * 0.22 + rng() * 0.02;
+
+      // Velocity after release
+      const radialAng = Math.atan2(ly, lx);
+      const closeness = 1 - Math.min(1, distFromLine / APPLE_RY);  // 1 = on line, 0 = at edge
+      const velMag = 120 + closeness * 380;                        // line particles fly hardest
+      const vx = Math.cos(radialAng) * velMag * 0.6 + 140 + closeness * 280;  // rightward bias
+      const vy = Math.sin(radialAng) * velMag;
+
+      // Color: mostly red, some paler flesh, rare yellow seed
+      const roll = rng();
+      let color;
+      if (roll < 0.55) color = `rgb(${180 + Math.floor(rng()*40)}, ${30 + Math.floor(rng()*30)}, ${30 + Math.floor(rng()*20)})`;
+      else if (roll < 0.85) color = `rgb(${200 + Math.floor(rng()*40)}, ${120 + Math.floor(rng()*40)}, ${90 + Math.floor(rng()*30)})`;
+      else color = `rgb(${220 + Math.floor(rng()*30)}, ${180 + Math.floor(rng()*40)}, ${80 + Math.floor(rng()*30)})`;
+
+      particles.push({
+        origX: px, origY: py,
+        vx, vy,
+        releaseT,
+        color,
+        size: 2.2 + rng() * 2.2
+      });
+    }
+  }
+
+  function drawAppleSolid(alpha, t) {
+    // Draw a solid apple shape beneath particles, fading out as rupture progresses
+    if (alpha <= 0.02) return;
+
+    // Body
+    ctx.save();
+    const bodyGrad = ctx.createRadialGradient(CX - 20, CY - 20, 10, CX, CY, APPLE_RX * 1.2);
+    bodyGrad.addColorStop(0, `rgba(230,120,110,${alpha})`);
+    bodyGrad.addColorStop(0.6, `rgba(190,45,45,${alpha})`);
+    bodyGrad.addColorStop(1, `rgba(120,20,25,${alpha})`);
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(CX, CY, APPLE_RX, APPLE_RY, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Highlight
+    ctx.beginPath();
+    ctx.ellipse(CX - 22, CY - 24, 16, 22, -0.3, 0, Math.PI * 2);
+    const hl = ctx.createRadialGradient(CX - 22, CY - 24, 2, CX - 22, CY - 24, 22);
+    hl.addColorStop(0, `rgba(255,230,220,${alpha * 0.7})`);
+    hl.addColorStop(1, `rgba(255,230,220,0)`);
+    ctx.fillStyle = hl;
+    ctx.fill();
+
+    // Bottom shadow
+    ctx.beginPath();
+    ctx.ellipse(CX + 12, CY + APPLE_RY * 0.5, APPLE_RX * 0.7, APPLE_RY * 0.3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(60,10,15,${alpha * 0.3})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStemAndLeaf(alpha) {
+    if (alpha <= 0.02) return;
+    ctx.save();
+    // Stem
+    ctx.fillStyle = `rgba(80,50,30,${alpha})`;
+    ctx.fillRect(CX - 3, CY - APPLE_RY - 12, 6, 14);
+    // Leaf
+    ctx.fillStyle = `rgba(70,120,50,${alpha})`;
+    ctx.beginPath();
+    ctx.ellipse(CX + 10, CY - APPLE_RY - 4, 10, 5, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(40,80,35,${alpha})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(CX + 4, CY - APPLE_RY - 6);
+    ctx.lineTo(CX + 18, CY - APPLE_RY - 3);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawParticles(t) {
+    // Each particle: either attached (at orig position) or flying (flight physics).
+    // Draw attached particles slightly transparent so the solid apple reads first.
+    for (const p of particles) {
+      if (t < p.releaseT - 0.03) continue; // not yet appearing
+
+      let x, y, alpha, size = p.size;
+      if (t < p.releaseT) {
+        // Fade in just before release
+        const u = (t - (p.releaseT - 0.03)) / 0.03;
+        alpha = u;
+        x = p.origX; y = p.origY;
+      } else {
+        const dt = t - p.releaseT;
+        x = p.origX + p.vx * dt;
+        y = p.origY + p.vy * dt + 0.5 * GRAVITY * dt * dt;
+        // Fade out over time
+        alpha = Math.max(0, 1 - dt * 0.8);
+      }
+      if (alpha <= 0.02) continue;
+
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = alpha;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawImpactFlash(t) {
+    // Entry flash
+    if (t >= IMPACT_T - 0.005 && t < IMPACT_T + 0.04) {
+      const a = 1 - Math.abs(t - (IMPACT_T + 0.01)) / 0.04;
+      if (a > 0) {
+        const ix = CX - APPLE_RX;
+        const iy = CY;
+        const r = 18 * a;
+        const grad = ctx.createRadialGradient(ix, iy, 0, ix, iy, r * 2);
+        grad.addColorStop(0, `rgba(255,241,165,${0.6 * a})`);
+        grad.addColorStop(1, 'rgba(255,241,165,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ix - r*2, iy - r*2, r*4, r*4);
+      }
+    }
+    // Exit burst (bigger, rightward)
+    if (t >= EXIT_T && t < EXIT_T + 0.12) {
+      const age = (t - EXIT_T) / 0.12;
+      const a = 1 - age;
+      if (a > 0) {
+        const ex = CX + APPLE_RX;
+        const ey = CY;
+        const r = (24 + 40 * (1 - a));
+        const grad = ctx.createRadialGradient(ex, ey, 0, ex, ey, r);
+        grad.addColorStop(0, `rgba(255,241,165,${0.55 * a})`);
+        grad.addColorStop(0.3, `rgba(255,120,90,${0.3 * a})`);
+        grad.addColorStop(1, 'rgba(255,120,90,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ex - r, ey - r, r*2, r*2);
+
+        // Radial spokes
+        const n = 10;
+        for (let i = 0; i < n; i++) {
+          const ang = (i / n - 0.5) * Math.PI;  // fan going rightward
+          const len = (10 + 40 * (1 - a));
+          ctx.strokeStyle = `rgba(255,241,165,${0.5 * a})`;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(ex + Math.cos(ang) * len, ey + Math.sin(ang) * len);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function drawBullet(t, fps) {
+    const bulletX = BULLET_START_X + BULLET_SPEED * t;
+    if (bulletX < -20 || bulletX > SCN_W + 60) return;
+    const bulletY = CY;
+
+    // Motion-blur streak length inversely proportional to capture fps
+    const exposureScene = Math.min(0.4, 1 / (fps * PHYSICAL_DURATION));
+    const streakLen = BULLET_SPEED * exposureScene;
+
+    // Streak gradient from faded tail to bright head
+    const tailX = bulletX - streakLen;
+    const grad = ctx.createLinearGradient(tailX, bulletY, bulletX, bulletY);
+    grad.addColorStop(0, 'rgba(255,217,77,0)');
+    grad.addColorStop(0.6, 'rgba(255,230,120,0.35)');
+    grad.addColorStop(1, 'rgba(255,255,220,0.95)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tailX, bulletY);
+    ctx.lineTo(bulletX, bulletY);
+    ctx.stroke();
+
+    // Bullet body (rounded rectangle)
+    ctx.save();
+    ctx.translate(bulletX, bulletY);
+    const L = 11, W = 4.5;
+    // Gradient metal
+    const mGrad = ctx.createLinearGradient(0, -W, 0, W);
+    mGrad.addColorStop(0, '#fff4bf');
+    mGrad.addColorStop(0.5, '#ffd94d');
+    mGrad.addColorStop(1, '#b07a14');
+    ctx.fillStyle = mGrad;
+    ctx.beginPath();
+    ctx.moveTo(-L, -W);
+    ctx.lineTo(L - W, -W);
+    ctx.arc(L - W, 0, W, -Math.PI / 2, Math.PI / 2);
+    ctx.lineTo(-L, W);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(40,30,10,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // Tip highlight
+    ctx.beginPath();
+    ctx.arc(L - W - 0.5, -1, 1.4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,220,0.8)';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawScene(t) {
+    ctx.clearRect(0, 0, cssW, cssH);
+    // Background gradient
+    const bg = ctx.createRadialGradient(cssW / 2, cssH * 0.45, 20, cssW / 2, cssH * 0.55, cssW * 0.75);
+    bg.addColorStop(0, '#0d0d12');
+    bg.addColorStop(1, '#060608');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    // Floor hint
+    const floorGrad = ctx.createLinearGradient(0, cssH * 0.82, 0, cssH);
+    floorGrad.addColorStop(0, 'rgba(255,217,77,0.03)');
+    floorGrad.addColorStop(1, 'rgba(255,217,77,0)');
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, cssH * 0.82, cssW, cssH * 0.18);
+
+    // Scale scene into canvas
+    const scale = Math.min(cssW / SCN_W, cssH / SCN_H);
+    const ox = (cssW - SCN_W * scale) / 2;
+    const oy = (cssH - SCN_H * scale) / 2;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.scale(scale, scale);
+
+    // Solid apple fades from 1.0 (intact) at t=0 to 0 around exit time
+    const solidAlpha = Math.max(0, 1 - Math.max(0, (t - IMPACT_T)) / Math.max(0.001, (EXIT_T + 0.05 - IMPACT_T)));
+    const stemAlpha = t < EXIT_T ? 1 : Math.max(0, 1 - (t - EXIT_T) / 0.15);
+    drawAppleSolid(solidAlpha, t);
+    drawStemAndLeaf(stemAlpha);
+
+    // Particles
+    drawParticles(t);
+
+    // Impact flashes
+    drawImpactFlash(t);
+
+    // Bullet on top
+    drawBullet(t, currentFps);
+
+    ctx.restore();
+  }
+
+  // ── MATH ──
+  function getMagnification()  { return currentFps / PLAYBACK_FPS; }
+  function getViewerDuration() { return PHYSICAL_DURATION * getMagnification(); }
+  function fmtMag(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10)   return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+  function fmtDur(s) {
+    if (s >= 1)     return s.toFixed(2) + ' s';
+    if (s >= 0.001) return (s * 1000).toFixed(1) + ' ms';
+    return (s * 1e6).toFixed(0) + ' μs';
+  }
+  function fmtFps(f) {
+    const rounded = Math.round(f);
+    return rounded.toLocaleString();
+  }
+
+  // ── UI ──
+  function updateChrome() {
+    document.getElementById('rateValue').innerHTML = `${fmtFps(currentFps)}<span class="unit">fps</span>`;
+    document.getElementById('rateSlider').value = fpsToSlider(currentFps);
+    document.getElementById('statCapture').textContent = `${fmtFps(currentFps)} fps`;
+    document.getElementById('statFactor').textContent = fmtMag(getMagnification());
+    document.getElementById('statStretch').textContent = fmtDur(getViewerDuration());
+
+    document.querySelectorAll('.preset').forEach(p => {
+      const pf = parseInt(p.dataset.fps);
+      const ratio = currentFps / pf;
+      p.classList.toggle('active', ratio > 0.97 && ratio < 1.03);
+    });
+  }
+
+  function animate(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.1);
+    lastWall = time;
+
+    if (playing) {
+      if (inPauseGap) {
+        pauseGapT += dt;
+        if (pauseGapT >= PAUSE_BETWEEN_LOOPS) {
+          inPauseGap = false;
+          pauseGapT = 0;
+          wallElapsed = 0;
+        }
+      } else {
+        wallElapsed += dt;
+        const vd = getViewerDuration();
+        if (wallElapsed >= vd) {
+          wallElapsed = vd;
+          inPauseGap = true;
+          pauseGapT = 0;
+        }
+      }
+    }
+
+    let sceneT;
+    if (inPauseGap) sceneT = 1.0;
+    else sceneT = getViewerDuration() > 0 ? (wallElapsed / getViewerDuration()) : 0;
+    sceneT = Math.max(0, Math.min(1, sceneT));
+    drawScene(sceneT);
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastWall = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  function setFps(newFps) {
+    const vdOld = getViewerDuration();
+    const curSceneT = vdOld > 0 ? (wallElapsed / Math.max(0.0001, vdOld)) : 0;
+    currentFps = Math.max(FPS_MIN, Math.min(FPS_MAX, newFps));
+    updateChrome();
+    wallElapsed = Math.max(0, Math.min(getViewerDuration(), curSceneT * getViewerDuration()));
+  }
+
+  document.getElementById('rateSlider').addEventListener('input', (e) => {
+    const v = parseInt(e.target.value);
+    setFps(sliderToFps(v));
+  });
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => setFps(parseInt(btn.dataset.fps)));
+  });
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  resize();
+  updateChrome();
+  drawScene(0);
+  window.addEventListener('resize', () => { resize(); });
+})();
+</script>
+</body>
+</html>

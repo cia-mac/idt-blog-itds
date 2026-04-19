@@ -1,110 +1,120 @@
 ---
-workflow_step: v4_baseline_split_into_buckets
+workflow_step: itd_020_slow_motion_v8_shipped
 agent_type: execute
 token_budget: deep
-last_updated: 2026-04-14
+last_updated: 2026-04-19
 ---
 
 # SESSION_STATE: idt-blog-itds
 
-**Last Updated:** 2026-04-14 (evening, post-split)
-**Session:** v3 redesign + v4 Ciamac retint + IDT/generic bucket split
+**Last Updated:** 2026-04-19 (00:56 PT)
+**Session:** ITD-020 concept exploration → slow-motion lever with bullet-through-apple
+**Last committed:** `75d9d9b` — "Ship v4 Ciamac-gold ITD baseline, split into idt-specific and generic" (2026-04-14)
+**Branch:** main (no remote configured)
 
 ## Current State
 
-All 14 ITDs shipped at v4 (ITD-004 at v5). Files now physically split into two buckets:
+Fifteen ITDs shipped prior to this session. This session added one new shippable ITD (ITD-020) and three abandoned concept prototypes (ITD-017, 018, 019). Gallery now at `index_v10.html` featuring ITD-020 as the hero, 10 generic + 6 IDT-specific = 16 total live entries. None of the new files are committed yet.
 
-- `idt-specific/` — 6 ITDs tied to IDT products or IDT-proprietary features. These cannot ship under ciamac.com as pure portfolio pieces without IDT context.
-- `generic/` — 9 ITDs covering high-speed imaging concepts that stand alone as educational content. Safe to host under ciamac.com or syndicate anywhere.
+### ITD-020: What Slow Motion Actually Is · `generic/itd-020-slow-motion_v8.html`
 
-Gallery indexes (`index_v1` through `index_v5`) still live at the repo root and reference the old flat paths. They need updating to point into the new buckets.
+- **Concept:** single canvas, single physical lever, watch a fast event slow down as the lever swings to higher frame rates.
+- **Scene:** procedural bullet-through-apple. 5 ms physical event. Apple renders as a solid red ellipse with stem, leaf, and highlight. Bullet is a gold oblong with a motion-blur streak whose length is inversely tied to capture fps. On impact, 190 particles release outward with analytic landing times on a floor plane (y=392 scene-space), then fade out on the ground.
+- **Lever:** dedicated canvas panel below the stage. Pivot at bottom-center, shaft swings through ±55° arc, gold-rimmed rubber knob at the tip, gold-bolt pivot cap, rivets on the base plate, arc groove with eight tick marks at the preset rates. Drag the knob or tap anywhere on the lever canvas. Log-scale fps mapping across [60, 20,000].
+- **Presets:** 4×2 card grid below the stats strip. Cards are the hero, each at 1.45em fps with a context label (`phone camera / action cam / broadcast / industrial / science lab / ballistics / impact research / the ceiling`). Active preset = gold border + gold faint fill + gold text. Active state only triggers when fps within 3% of a preset value.
+- **Stats strip:** `Capture | Slow-Motion Factor (hero gold) | 5 ms stretches to`. Persistent readout outside the scene.
+- **Loop behavior:** scene runs t=0 to t=1 then pauses for 1.6 s on the intact apple (t=0). Scene-end fade ramp from t=0.82 to t=1.0 wipes all transient elements so the transition to pause is clean.
+
+### Abandoned concepts (files preserved, NOT in gallery)
+
+- **ITD-017** `generic/itd-017-highspeed-tradeoff_v1.html`, `_v2.html` — three-slider tradeoff interactive (fps/resolution/memory with record-time readout). User rejected concept after v2. "This concept is not working."
+- **ITD-018** `generic/itd-018-time-magnification_v1.html`, `_v2.html` — dual-scale timeline showing real-time vs viewer-time. Started with balloon pop (v1), then electric arc (v2). Superseded by ITD-020 pure slow-mo pattern.
+- **ITD-019** `generic/itd-019-filmstrip_v1.html`, `_v2.html` — Muybridge-style contact sheet of captured frames. User rejected. "I don't want frames like that, doesn't do anything for me."
+
+### Design tokens preserved
+
+- v4 Ciamac-gold palette intact across ITD-020: `#ffd94d` accent, DM Sans + JetBrains Mono, noise overlay, fadeUp, `#09090b` bg. New ITD-020 uses the same grammar.
 
 ## What Was Done This Session
 
-1. **v2 -> v3 design-system upgrade (14 files).** Dispatched 7 parallel agents. Each redesigned a batch to DM Sans + JetBrains Mono, CSS variables, `.itd-tag` gold display label, noise overlay, `fadeUp` animation, `.panel` hover lift, `.itd-footer` with ciamac.com link. Stripped every IDT / idtcameras.com reference in body copy. Specs strip "Source" relabeled to "Author" = `ciamac.com`. JavaScript preserved byte-identical across every file.
+1. **Onboarded on ITD concept** (first message) — read Notion pages for ITD business concept, pattern/pipeline, and series buildout. Confirmed ITD = Interactive Technical Diagrams. Existing 14 ITDs split into generic + idt-specific.
+2. **ITD-017 Tradeoff** (v1 → v2) — built a fps/resolution/memory tradeoff interactive with accumulating memory bar. Rejected by user.
+3. **ITD-018 Time Magnification** (v1 → v2) — dual-scale timeline, balloon pop (v1), then switched to electric arc after user accepted that subject. 20,000 fps cap applied.
+4. **ITD-019 Frame Filmstrip** (v1 → v2) — contact-sheet grid, same arc subject. Rejected.
+5. **Pivot to pure slow-mo playback.** User prescription: "show a fast event then slow it down to 20000."
+6. **ITD-020 build and iterate** (v1 → v8):
+   - v1/v2: mousetrap scene (user said "try something else" eventually)
+   - v3: cleaned up HUD, added stats strip, fixed scene layout bugs
+   - v4: upgraded preset chips to prominent card grid ("all about the frame rates")
+   - v5: continuous log-scale slider, bullet-through-apple scene
+   - v6: replaced horizontal slider with pivoting arc lever (user: "the frame rate should be a lever")
+   - v7: strengthened gravity, reduced rightward velocity, intact-apple pause state
+   - v8: particle count 340→190, analytic landing times + floor settle, scene-end fade
+7. **Gallery rewrites**: index_v7 (ITD-017 featured), v8 (018/019 featured, dropped 017), v9 (ITD-020 featured, dropped 017/018/019), v10 (ITD-020 v8 pointer).
+8. **All files opened in browser** after each write per memory rule.
 
-2. **Course correction.** Ciamac asked: "what are my colors for ciamac.com? should we think of its own art direction? should all my ITDs look the same?" The v3 pass used IDT's olive gold `#E8B600` under a ciamac.com label.
+## File Inventory (new this session)
 
-3. **Design direction locked.** Hybrid: one typographic system, one substrate, one structural grammar, flexible accent per ITD. Baseline accent `#ffd94d` (Ciamac warm gold). Per-ITD bespoke art direction deferred.
+### `generic/` additions
 
-4. **v3 -> v4 retint (14 files).** Dispatched 4 parallel agents. Mechanical swap of every `#E8B600`, `#f0d060`, and `rgba(232,182,0,*)` literal across CSS AND inline JS canvas colors. 165 total substitutions.
+| File | Status |
+|---|---|
+| `itd-017-highspeed-tradeoff_v1.html` | abandoned concept (not in gallery) |
+| `itd-017-highspeed-tradeoff_v2.html` | abandoned concept (not in gallery) |
+| `itd-018-time-magnification_v1.html` | abandoned concept (not in gallery) |
+| `itd-018-time-magnification_v2.html` | abandoned concept (not in gallery) |
+| `itd-019-filmstrip_v1.html` | abandoned concept (not in gallery) |
+| `itd-019-filmstrip_v2.html` | abandoned concept (not in gallery) |
+| `itd-020-slow-motion_v1.html` | abandoned (mousetrap) |
+| `itd-020-slow-motion_v2.html` | abandoned (mousetrap) |
+| `itd-020-slow-motion_v3.html` | abandoned (mousetrap, stats strip pass) |
+| `itd-020-slow-motion_v4.html` | abandoned (mousetrap, preset cards pass) |
+| `itd-020-slow-motion_v5.html` | abandoned (bullet+apple, log slider, pre-lever) |
+| `itd-020-slow-motion_v6.html` | abandoned (arc lever, pre-physics-tune) |
+| `itd-020-slow-motion_v7.html` | prior baseline |
+| `itd-020-slow-motion_v8.html` | **SHIPPABLE. Featured in gallery.** |
 
-5. **IDT vs generic split (2026-04-14 evening).** Grep audit of all v4 files for IDT product/feature references (IDT, Phoenix, Galileo, XSM, CCM, CrashCam, XSLink, XStream, Helios, SugarCube, OS II, XS II, RT V/IV/III, Viper, XDR). Moved all versions (v1 through latest) of each ITD into `idt-specific/` or `generic/` subdirectories. Blog-post drafts moved with their ITDs.
+### Root
 
-6. **Memory updated.** Added `reference_ciamac_brand_colors.md` and `project_itd_design_system.md`.
-
-## File Inventory
-
-### `idt-specific/` (6 ITDs)
-
-| ITD | Latest | Topic | Why IDT-specific |
-|---|---|---|---|
-| 004 | v5 | FPS vs Resolution | References IDT camera models |
-| 005 | v4 | Camera Placement | References IDT product configurations |
-| 010 | v4 | Pixel Size | Preset names reference Helios, XS II, etc. |
-| 012 | v4 | Connection Topology | Full IDT product palette in interactive |
-| 015 | v4 | XDR | XDR is IDT proprietary feature name |
-| 016 | v4 | XSLink Hub | XSLink Hub is the subject itself |
-
-### `generic/` (9 ITDs)
-
-| ITD | Latest | Topic |
-|---|---|---|
-| 002 | v4 | SDI Signal Path |
-| 003 | v4 | State Machine |
-| 006 | v4 | Stereo PIV |
-| 007 | v4 | Sensor Readout |
-| 008 | v2 (unchanged, per user) | Bit Depth |
-| 009 | v4 | Exposure vs Motion Blur |
-| 011 | v4 | Temporal Resolution |
-| 013 | v4 | Trigger Modes |
-| 014 | v4 | High Dynamic Range |
-
-### Root (untouched)
-
-- `index_v1` through `index_v5` — gallery pages, still reference flat paths
-- `SESSION_STATE.md`, `SESSION_STATE_v3.md`, `SESSION_STATE_v4.md`
-- `SDI_HighSpeed_Cameras_Preview.pdf`, `console-workflow_v1.html` — untracked from prior sessions, leave alone
-
-## Design System (v4 tokens)
-
-- Background `#09090b`, surface `#0f0f12`, surface-raised `#131318`
-- Accent gold `#ffd94d` (Ciamac warm), gradient pair `#fff1a5`
-- Borders `rgba(255,255,255,0.06)` default, `0.1` hover
-- Text `#c8c8d0` body, `#6a6a78` dim, `#3e3e4a` muted
-- Red `#ef4444`, green `#22c55e`, cable blue `#4080D0` (ITD-012 semantic)
-- Radius `14px` large, `8px` small
-- Fonts: DM Sans (display/body), JetBrains Mono (data/labels)
-- Noise overlay: SVG feTurbulence, opacity 0.03, z-index 9999
-- Animation: `fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1)` with staggered delays
+| File | Status |
+|---|---|
+| `index_v7.html` | superseded |
+| `index_v8.html` | superseded |
+| `index_v9.html` | superseded |
+| `index_v10.html` | **current live gallery (featuring ITD-020 v8)** |
+| `SESSION_STATE_v5.md` | pre-overwrite snapshot of the prior SESSION_STATE |
 
 ## Next Actions
 
-1. Update gallery (`index_v6.html` new version) to point into `idt-specific/` and `generic/` subfolders and optionally show them as two sections.
-2. Ciamac decides hosting strategy: `generic/` set likely lives under ciamac.com portfolio; `idt-specific/` set stays with IDT blog pipeline.
-3. Commit the v3 + v4 + split batch to git.
-4. Pick pilot ITD for per-ITD art direction pass. Candidates from `generic/`: ITD-014 HDR (luminance gradient accent), ITD-006 Stereo PIV (anaglyph cyan/magenta). From `idt-specific/`: ITD-012 Connection Topology (already semantic).
-5. If per-ITD pass happens, establish a playbook doc so the method is repeatable.
+1. **Commit.** Every file in this session is untracked. Needs a clean commit per project discipline. Suggested:
+   - `git add SESSION_STATE.md SESSION_STATE_v5.md generic/itd-020-* index_v10.html`
+   - `git commit -m "Ship ITD-020 slow-motion lever with bullet-through-apple; v10 gallery"`
+   - Decide separately whether to commit or `/archive` the ITD-017/018/019 abandoned attempts.
+2. **Decide hosting.** No git remote on this repo. When ready to share ITD-020, push to `cia-mac` on GitHub and enable GitHub Pages.
+3. **Write blog post for ITD-020** (if/when IDT blog pipeline resumes). Currently on ice per locked read on Luiz.
+4. **Possible ITD-021: crash test**. User mentioned this mid-session; parked when direction pivoted to slow-motion. Concept proposed: side-view impact with airbag deploy timing + head excursion trajectory + measurement uncertainty band that shrinks as fps rises. Physical duration ~100-150 ms.
+5. **Consider archiving abandoned attempts** (017/018/019 v1+v2) to `/archive/abandoned-concepts/` so they stop cluttering the `generic/` directory without being deleted.
 
 ## Blockers
 
-- No git commits yet on this session's work. Ciamac should eyeball before we commit.
-- Gallery indexes reference flat paths and will 404 after the split until updated.
-- Per-ITD art direction deferred. No pilot picked.
+- **No git remote configured.** Repo is local-only. Can't share via URL until remote + Pages configured.
+- **IDT work is on ice** per Luiz locked read (2026-04-14). `idt-specific/` bucket continues to be dormant. `generic/` is safe to continue developing — ITD-020 went in there.
 
 ## Fragile Areas
 
-- ITD-012 drag-and-drop depends on exact class names / JS-hardcoded `CONN_COLORS` hex values. Retint swapped `CONN_COLORS.fiber` and `rtv` to `#ffd94d`. Red/blue/green cable colors preserved.
-- ITD-013 ring-buffer animation uses `requestAnimationFrame` timing; retint only touched color string literals.
-- ITD-014 HDR scene canvas uses tone-mapped literals that do NOT include IDT gold, so the retint there only hit UI chrome.
-- ITD-004 has two em dashes inside preserved JS comments (byte-identical source). The em-dash ban applies to authored text, not protected script.
-- File paths changed this session. Any external link, docs reference, or gallery page pointing to `itd-XXX-*_v4.html` at the repo root is now broken. Update to `idt-specific/` or `generic/` subdir.
+- **Preset active-state tolerance** (ratio 0.97-1.03) means continuous-slider drags near a preset will show it active, then inactive once you pass. Intentional; don't tighten or loosen without confirming the feel.
+- **Analytic landing time** (`landingTime` per particle) depends on `vy*vy + 2*GRAVITY*dy >= 0`. If future tuning pushes vy strongly negative (upward) with small dy to floor, the discriminant could go negative — code falls back to `99` (never lands), which means that particle just fades out mid-air. Fine for now but fragile under further velocity tuning.
+- **Lever hit area** is the entire lever canvas. Clicking anywhere maps to an angle. No radius check on the knob itself. User said this was fine but if it gets changed, preserve the "click anywhere on canvas to set angle" behavior.
+- **Bullet motion-blur streak** at low fps extends beyond the scene-space SCN_W bounds before being clipped by the ctx.scale scope. If the streak math changes, verify it doesn't paint outside the stage canvas.
+- **Scene-end fade (0.82-1.0)** is applied in two places: inside `drawParticles` and around `drawImpactFlash`/`drawBullet` via `globalAlpha`. If another scene element is added to `drawScene`, remember to wrap it in the same fade so it doesn't pop.
 
 ## Context for Next Session
 
-- v3 files are kept as the IDT-gold snapshot. v4 is the Ciamac-gold baseline.
-- The `/tmp/itd_v3_design_system.md` and `/tmp/itd_v4_retint_spec.md` specs exist and were used this session. Keep as playbook drafts.
-- Design direction decision is in memory as `project_itd_design_system.md`. Any future ITD starts from `#ffd94d` baseline, not IDT olive.
-- Split decision: if a future ITD depends on IDT product names or IDT-proprietary features, it belongs in `idt-specific/`. If it teaches a concept that stands alone, `generic/`.
-- Preview server from earlier this session (bash id `boq9e7aa8`) was running on 127.0.0.1:8090. Paths it was serving are now stale post-split; restart if needed.
-- IDT work is on ice as of 2026-04-14 per standing memory. The `idt-specific/` bucket is therefore on ice too until lifted. `generic/` is safe to continue developing.
+- **ITD-020 v8 is the shipped version.** `generic/itd-020-slow-motion_v8.html`. Opens cleanly, loop feels complete, fall settles on floor before reset.
+- **The lever is literally a lever** — pivoting arc with gold knob. User specifically requested this form factor after rejecting horizontal sliders.
+- **Apple visibility during pause state** was the last fix: pause gap now rests on t=0 (intact apple) not t=1.0 (exploded). If you see the exploded-state lingering, check `inPauseGap ? sceneT = 0.0`.
+- **Subject pipeline:** rejected subjects so far were droplet, mousetrap (as the rejected v1-v4 scene), hummingbird (dismissed as too hard to render procedurally). Accepted: electric arc, bullet-through-apple. If you need another subject, avoid naturalistic organic forms and favor geometric/procedural.
+- **Preset labels are the user's touch:** `phone camera / action cam / broadcast / industrial / science lab / ballistics / impact research / the ceiling`. Keep this tone — concrete + slightly cheeky — for any future preset contexts.
+- **Continuous lever + discrete presets** is the pattern. Lever drags freely in log fps space, presets snap and highlight only when within 3% of the preset value.
+- **20,000 fps is the cap.** User explicitly capped this. Don't go higher.
+- **5 ms is the canonical physical event duration** for slow-mo demos in this series. Gives 2× magnification at 60 fps (a blink) and 666× at 20k (3.3 s viewer). If you pick a different subject, target a physical duration that works across that range.
