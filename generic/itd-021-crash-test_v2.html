@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-021: The Camera Is A Ruler</title>
+<meta property="og:title" content="ITD-021: The Camera Is A Ruler">
+<meta property="og:description" content="A crash test lasts 120 milliseconds. Pull the lever, pick a frame rate, see how much of that event your camera can actually measure.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.7em, 4.5vw, 2.3em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.95em; color: var(--text-dim); max-width: 620px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .stage {
+    position: relative;
+    background: #0a0a0d;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  #sceneCanvas { width: 100%; height: 540px; display: block; background: #0a0a0d; }
+  .stage-controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 16px 20px;
+    background: linear-gradient(to top, rgba(9,9,11,0.96) 40%, rgba(9,9,11,0));
+    display: flex; align-items: center; gap: 14px;
+    z-index: 2;
+  }
+  .btn-play {
+    font-family: 'JetBrains Mono', monospace;
+    border: none; padding: 10px 22px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-weight: 700; font-size: 0.78em; letter-spacing: 0.6px;
+    background: var(--gold); color: var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn-play:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .lever-panel {
+    position: relative;
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
+  }
+  .lever-panel-label {
+    position: absolute;
+    top: 14px; left: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--gold);
+    z-index: 2;
+    pointer-events: none;
+  }
+  #leverCanvas {
+    width: 100%;
+    height: 260px;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #leverCanvas.grabbing { cursor: grabbing; }
+
+  .stats-strip {
+    display: grid; grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 12px; margin-top: 16px;
+    padding: 18px 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.55s backwards;
+  }
+  .stat { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+  .stat:first-child { align-items: flex-start; text-align: left; }
+  .stat:last-child { align-items: flex-end; text-align: right; }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--text-muted);
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95em; font-weight: 600;
+    color: var(--text); letter-spacing: -0.3px;
+  }
+  .stat-hero .stat-label { color: var(--gold-dim); }
+  .stat-hero .stat-value {
+    font-size: clamp(1.6em, 3.5vw, 2.4em); font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -1px; line-height: 1;
+  }
+
+  .preset-grid-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: var(--gold); margin: 28px 0 12px;
+    display: flex; align-items: center; gap: 12px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+  }
+  .preset-grid-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.65s backwards;
+  }
+  .preset {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 18px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative; overflow: hidden; min-height: 92px;
+  }
+  .preset:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .preset.active {
+    border-color: var(--gold);
+    background: var(--gold-faint);
+    box-shadow: 0 4px 24px rgba(255,217,77,0.12);
+  }
+  .preset.active::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top, rgba(255,217,77,0.06), transparent 70%);
+    pointer-events: none;
+  }
+  .preset-fps {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.45em; font-weight: 700;
+    color: var(--text); letter-spacing: -0.8px; line-height: 1.1;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset-fps .unit {
+    font-size: 0.55em; font-weight: 500;
+    color: var(--text-dim); margin-left: 4px; letter-spacing: 0;
+  }
+  .preset-ctx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 500;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1.2px; margin-top: 8px;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset:hover .preset-fps { color: #fff; }
+  .preset.active .preset-fps { color: var(--gold); }
+  .preset.active .preset-fps .unit { color: rgba(255,217,77,0.55); }
+  .preset.active .preset-ctx { color: rgba(255,217,77,0.75); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 18px 22px; margin: 24px 0 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.7s backwards;
+  }
+  .note p { font-size: 0.92em; color: var(--text); line-height: 1.7; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding: 22px 0; border-top: 1px solid var(--border); margin-top: 28px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78em; color: var(--gold); }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s; }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 900px) {
+    .preset-grid { grid-template-columns: repeat(2, 1fr); }
+    .preset-fps { font-size: 1.3em; }
+  }
+  @media (max-width: 700px) {
+    #sceneCanvas { height: 460px; }
+    #leverCanvas { height: 220px; }
+    .stats-strip { grid-template-columns: 1fr; gap: 14px; padding: 14px 18px; }
+    .stat, .stat:first-child, .stat:last-child { align-items: center; text-align: center; }
+    .preset { min-height: 82px; padding: 14px 10px; }
+    .preset-fps { font-size: 1.2em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-021 / Interactive Technical Diagram</div>
+  <h1>The Camera Is A Ruler</h1>
+  <div class="subtitle">A frontal crash lasts 120 milliseconds. The airbag fires 15 ms in. Peak head excursion happens near 90 ms. Pull the lever. Watch how many of those milliseconds your camera can actually resolve.</div>
+
+  <div class="stage">
+    <canvas id="sceneCanvas"></canvas>
+    <div class="stage-controls">
+      <button class="btn-play" id="btnPlay">Pause</button>
+    </div>
+  </div>
+
+  <div class="lever-panel">
+    <div class="lever-panel-label">Frame-Rate Lever</div>
+    <canvas id="leverCanvas"></canvas>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-label">Capture</div>
+      <div class="stat-value" id="statCapture">60 fps</div>
+    </div>
+    <div class="stat stat-hero">
+      <div class="stat-label">Frames During Impact</div>
+      <div class="stat-value" id="statFrames">7</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Between Samples</div>
+      <div class="stat-value" id="statInterval">16.7 ms</div>
+    </div>
+  </div>
+
+  <div class="preset-grid-label">Frame Rates</div>
+  <div class="preset-grid" id="presetGrid">
+    <button class="preset active" data-fps="60"><span class="preset-fps">60<span class="unit">fps</span></span><span class="preset-ctx">phone camera</span></button>
+    <button class="preset" data-fps="240"><span class="preset-fps">240<span class="unit">fps</span></span><span class="preset-ctx">action cam</span></button>
+    <button class="preset" data-fps="1000"><span class="preset-fps">1,000<span class="unit">fps</span></span><span class="preset-ctx">broadcast</span></button>
+    <button class="preset" data-fps="2500"><span class="preset-fps">2,500<span class="unit">fps</span></span><span class="preset-ctx">industrial</span></button>
+    <button class="preset" data-fps="5000"><span class="preset-fps">5,000<span class="unit">fps</span></span><span class="preset-ctx">science lab</span></button>
+    <button class="preset" data-fps="10000"><span class="preset-fps">10,000<span class="unit">fps</span></span><span class="preset-ctx">ballistics</span></button>
+    <button class="preset" data-fps="15000"><span class="preset-fps">15,000<span class="unit">fps</span></span><span class="preset-ctx">impact research</span></button>
+    <button class="preset" data-fps="20000"><span class="preset-fps">20,000<span class="unit">fps</span></span><span class="preset-ctx">the ceiling</span></button>
+  </div>
+
+  <div class="note">
+    <p>In crash certification the high-speed camera is not there to make the crash look cool. It is there as a <strong>measurement instrument</strong>. Engineers need to know when the airbag fired, how far the head traveled, whether peak excursion cleared the steering wheel. A 60 fps camera samples the 120 ms event seven times, one frame every 16.7 ms, so the airbag is already fully deployed by the time the second frame arrives. At 5,000 fps the same event is six hundred samples with 0.2 ms between them, and the head's trajectory resolves into a continuous curve. The crash didn't get slower. The ruler got finer.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-021</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Temporal Resolution</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Physical Lever</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-021 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.120;
+  const PLAYBACK_DURATION = 3.2;
+  const FPS_MIN = 60;
+  const FPS_MAX = 20000;
+  const PAUSE_BETWEEN_LOOPS = 1.2;
+
+  const LOG_RANGE = Math.log(FPS_MAX / FPS_MIN);
+  const LEVER_MIN_ANG = -55 * Math.PI / 180;
+  const LEVER_MAX_ANG =  55 * Math.PI / 180;
+
+  function fpsToAngle(fps) {
+    const u = Math.log(Math.max(FPS_MIN, Math.min(FPS_MAX, fps)) / FPS_MIN) / LOG_RANGE;
+    return LEVER_MIN_ANG + u * (LEVER_MAX_ANG - LEVER_MIN_ANG);
+  }
+  function angleToFps(angle) {
+    const u = (angle - LEVER_MIN_ANG) / (LEVER_MAX_ANG - LEVER_MIN_ANG);
+    return FPS_MIN * Math.exp(u * LOG_RANGE);
+  }
+
+  const TICK_FPS = [60, 240, 1000, 2500, 5000, 10000, 15000, 20000];
+
+  // ── STATE ──
+  let currentFps = 60;
+  let playing = true;
+  let sceneAnimId = null;
+  let lastWall = 0;
+  let wallTimeNow = 0;
+  let wallElapsed = 0;
+  let inPauseGap = false;
+  let pauseGapT = 0;
+  let dragging = false;
+  let lastSampledIdx = -1;
+  let shutterFlashWallTime = -999;
+
+  // ── SCENE CANVAS ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resizeScene() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Scene coords: 640 × 420, side view, car moving LEFT into wall
+  const SCN_W = 640, SCN_H = 420;
+  const FLOOR_Y = 355;
+  const WALL_X_END = 22;
+
+  // Steering wheel / dummy anchors
+  const WHEEL_CX = 235, WHEEL_CY = 258, WHEEL_R = 22;
+  const TORSO_TOP_X = 478, TORSO_TOP_Y = 188;
+  const HEAD_R = 20;
+
+  // Head motion: rest near seat, peak forward near wheel, partial rebound
+  const HEAD_REST_X = 486;
+  const HEAD_REST_Y = 162;
+  const HEAD_PEAK_X = 298;
+  const HEAD_PEAK_T = 0.72;
+
+  function trueHeadPos(t) {
+    let u;
+    if (t < 0.10) {
+      u = t / 0.10 * 0.04;
+    } else if (t < HEAD_PEAK_T) {
+      const s = (t - 0.10) / (HEAD_PEAK_T - 0.10);
+      u = 0.04 + (1 - 0.04) * (s * s * (3 - 2 * s));
+    } else {
+      const s = (t - HEAD_PEAK_T) / (1 - HEAD_PEAK_T);
+      u = 1 - 0.55 * (s * s * (3 - 2 * s));
+    }
+    const x = HEAD_REST_X + (HEAD_PEAK_X - HEAD_REST_X) * u;
+    const y = HEAD_REST_Y + Math.sin(u * Math.PI) * 8;
+    return { x, y, u };
+  }
+
+  function airbagRadius(t) {
+    if (t < 0.125) return 0;
+    if (t < 0.32) {
+      const s = (t - 0.125) / (0.32 - 0.125);
+      return 62 * (s * s * (3 - 2 * s));
+    }
+    const compress = Math.max(0, 1 - Math.abs(t - 0.72) / 0.22) * 0.18;
+    return 62 * (1 - compress);
+  }
+
+  // ── SCENE DRAWING ──
+  function drawBackground() {
+    const bg = ctx.createRadialGradient(cssW / 2, cssH * 0.45, 20, cssW / 2, cssH * 0.55, cssW * 0.75);
+    bg.addColorStop(0, '#0d0d12');
+    bg.addColorStop(1, '#060608');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+  }
+
+  function drawWall() {
+    // concrete barrier on the left
+    ctx.save();
+    ctx.fillStyle = '#1c1c22';
+    ctx.fillRect(0, 0, WALL_X_END, SCN_H);
+    // vertical edge
+    ctx.fillStyle = '#0a0a0c';
+    ctx.fillRect(WALL_X_END - 3, 0, 3, SCN_H);
+    // horizontal lines suggesting concrete slabs
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let y = 20; y < SCN_H; y += 34) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WALL_X_END, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawGroundShadow() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(330, FLOOR_Y + 14, 240, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,217,77,0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, FLOOR_Y); ctx.lineTo(SCN_W, FLOOR_Y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCarBody() {
+    // Simplified cabin cross-section silhouette, car moving left (front = left)
+    ctx.save();
+    ctx.fillStyle = '#14141a';
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(WALL_X_END + 20, FLOOR_Y);           // front bumper at wall
+    ctx.lineTo(WALL_X_END + 16, 272);               // front grille (slightly crumpled)
+    ctx.lineTo(WALL_X_END + 36, 232);               // hood leading edge
+    ctx.lineTo(108, 228);                            // hood rear
+    ctx.lineTo(158, 148);                            // A-pillar top (windshield base)
+    ctx.lineTo(478, 148);                            // roof
+    ctx.lineTo(542, 226);                            // C-pillar
+    ctx.lineTo(604, 248);                            // rear deck
+    ctx.lineTo(622, FLOOR_Y);                        // rear bumper
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // windshield glass tint
+    ctx.fillStyle = 'rgba(120,170,220,0.07)';
+    ctx.beginPath();
+    ctx.moveTo(108, 228);
+    ctx.lineTo(158, 148);
+    ctx.lineTo(288, 148);
+    ctx.lineTo(232, 228);
+    ctx.closePath();
+    ctx.fill();
+
+    // side/rear window
+    ctx.beginPath();
+    ctx.moveTo(300, 148);
+    ctx.lineTo(478, 148);
+    ctx.lineTo(538, 222);
+    ctx.lineTo(336, 222);
+    ctx.closePath();
+    ctx.fill();
+
+    // wheels
+    ctx.fillStyle = '#0a0a0c';
+    ctx.beginPath(); ctx.arc(118, FLOOR_Y, 24, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(520, FLOOR_Y, 24, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a2a32';
+    ctx.beginPath(); ctx.arc(118, FLOOR_Y, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(520, FLOOR_Y, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#44444d';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(118, FLOOR_Y, 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(520, FLOOR_Y, 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDashboard() {
+    ctx.save();
+    // dashboard slab inside cabin
+    ctx.fillStyle = '#24242b';
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(108, 228);
+    ctx.lineTo(232, 228);
+    ctx.lineTo(268, 290);
+    ctx.lineTo(108, 290);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawSteering() {
+    ctx.save();
+    // column from dash to wheel
+    ctx.strokeStyle = '#3a3a42';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(195, 252); ctx.lineTo(WHEEL_CX, WHEEL_CY);
+    ctx.stroke();
+    // wheel ring (side view = narrow ellipse)
+    ctx.strokeStyle = '#484850';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(WHEEL_CX, WHEEL_CY, 6, WHEEL_R, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // hub (airbag stows here)
+    ctx.fillStyle = '#2e2e35';
+    ctx.beginPath();
+    ctx.ellipse(WHEEL_CX, WHEEL_CY, 5, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSeat() {
+    ctx.save();
+    // seat back
+    ctx.fillStyle = '#1b1b22';
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(502, 160);
+    ctx.quadraticCurveTo(550, 158, 552, 300);
+    ctx.lineTo(508, 300);
+    ctx.lineTo(504, 172);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // headrest
+    ctx.fillStyle = '#161619';
+    ctx.beginPath();
+    ctx.moveTo(500, 148);
+    ctx.lineTo(548, 148);
+    ctx.lineTo(548, 170);
+    ctx.lineTo(500, 170);
+    ctx.closePath();
+    ctx.fill();
+    // cushion
+    ctx.fillStyle = '#1b1b22';
+    ctx.beginPath();
+    ctx.moveTo(430, 300);
+    ctx.lineTo(552, 300);
+    ctx.lineTo(560, 324);
+    ctx.lineTo(422, 324);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTorso() {
+    ctx.save();
+    // torso silhouette in the seat, shoulders angled
+    ctx.fillStyle = '#2c2c34';
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(TORSO_TOP_X - 2, TORSO_TOP_Y);              // neck base left
+    ctx.lineTo(TORSO_TOP_X + 14, TORSO_TOP_Y);             // neck base right
+    ctx.quadraticCurveTo(TORSO_TOP_X + 38, TORSO_TOP_Y + 8,
+                         TORSO_TOP_X + 32, TORSO_TOP_Y + 30); // shoulder curve
+    ctx.lineTo(TORSO_TOP_X + 28, 295);                     // side down to hip
+    ctx.lineTo(TORSO_TOP_X - 14, 298);                     // lap
+    ctx.lineTo(TORSO_TOP_X - 18, TORSO_TOP_Y + 34);        // back
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // neck
+    ctx.fillStyle = '#3a3a42';
+    ctx.fillRect(TORSO_TOP_X + 2, TORSO_TOP_Y - 10, 10, 12);
+    // seatbelt shoulder strap (gold webbing)
+    ctx.strokeStyle = 'rgba(200,170,70,0.75)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(TORSO_TOP_X + 32, TORSO_TOP_Y + 22);
+    ctx.lineTo(TORSO_TOP_X - 16, 298);
+    ctx.stroke();
+    // lap belt
+    ctx.beginPath();
+    ctx.moveTo(TORSO_TOP_X - 16, 298);
+    ctx.lineTo(TORSO_TOP_X + 28, 296);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawAirbag(t) {
+    const r = airbagRadius(t);
+    if (r < 1) return;
+    ctx.save();
+    // stows at wheel hub, balloons up-right toward driver
+    const cx = WHEEL_CX + r * 0.75;
+    const cy = WHEEL_CY - r * 0.55;
+    // umbilical fabric connecting bag to hub while inflating
+    if (r < 55) {
+      ctx.strokeStyle = 'rgba(210,210,220,0.6)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(WHEEL_CX, WHEEL_CY);
+      ctx.lineTo(cx - r * 0.7, cy + r * 0.4);
+      ctx.stroke();
+    }
+    const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+    grad.addColorStop(0, 'rgba(252,252,255,0.98)');
+    grad.addColorStop(0.55, 'rgba(218,218,228,0.9)');
+    grad.addColorStop(1, 'rgba(150,150,160,0.35)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 1.0, r * 0.85, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // fabric seam
+    ctx.strokeStyle = 'rgba(180,180,190,0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * 0.78, r * 0.62, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTrajectory(sampledT) {
+    // Ghost of TRUE trajectory (dotted)
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,217,77,0.2)';
+    ctx.setLineDash([2, 4]);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40;
+      const { x, y } = trueHeadPos(t);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Reconstructed line through sampled dots (what the camera actually measures)
+    const N = Math.max(1, Math.round(currentFps * PHYSICAL_DURATION));
+    ctx.strokeStyle = 'rgba(255,217,77,0.88)';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    let drew = 0;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      if (t > sampledT + 1e-6) break;
+      const { x, y } = trueHeadPos(t);
+      if (drew === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      drew++;
+    }
+    ctx.stroke();
+
+    // Sample dots; scale down visually when N is huge
+    const dotR = Math.max(0.8, Math.min(2.6, 2.6 - Math.log10(Math.max(1, N)) * 0.45));
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      if (t > sampledT + 1e-6) break;
+      const { x, y } = trueHeadPos(t);
+      ctx.fillStyle = '#ffd94d';
+      ctx.beginPath();
+      ctx.arc(x, y, dotR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawHead(t) {
+    const { x, y } = trueHeadPos(t);
+    ctx.save();
+    // muted gray head, NOT gold — gold belongs to the measurement overlay
+    const headGrad = ctx.createRadialGradient(x - 6, y - 6, 3, x, y, HEAD_R);
+    headGrad.addColorStop(0, '#7c7c86');
+    headGrad.addColorStop(1, '#2e2e36');
+    ctx.fillStyle = headGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, HEAD_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // face profile facing left (toward wall)
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.arc(x - HEAD_R * 0.25, y, HEAD_R * 0.7, -0.55, 0.55);
+    ctx.fill();
+    // nose bump
+    ctx.fillStyle = '#4a4a52';
+    ctx.beginPath();
+    ctx.moveTo(x - HEAD_R + 2, y - 3);
+    ctx.lineTo(x - HEAD_R - 4, y + 1);
+    ctx.lineTo(x - HEAD_R + 2, y + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTimeline(sampledT) {
+    const tlW = 320;
+    const tlX = (SCN_W - tlW) / 2;
+    const tlY = 396;
+    ctx.save();
+    // track
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillRect(tlX, tlY, tlW, 4);
+
+    const N = Math.max(1, Math.round(currentFps * PHYSICAL_DURATION));
+    const tickAlpha = N > 400 ? 0.22 : 0.85;
+    ctx.strokeStyle = `rgba(255,217,77,${tickAlpha})`;
+    ctx.lineWidth = N > 400 ? 0.5 : 1.1;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      if (t > sampledT + 1e-6) break;
+      const x = tlX + t * tlW;
+      ctx.beginPath();
+      ctx.moveTo(x, tlY - 4); ctx.lineTo(x, tlY + 8);
+      ctx.stroke();
+    }
+    // progress line underlay
+    ctx.strokeStyle = 'rgba(255,217,77,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(tlX, tlY + 2); ctx.lineTo(tlX + sampledT * tlW, tlY + 2);
+    ctx.stroke();
+
+    ctx.font = '500 9px "JetBrains Mono", monospace';
+    ctx.fillStyle = 'rgba(170,170,180,0.65)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('0 ms', tlX, tlY + 14);
+    ctx.textAlign = 'right';
+    ctx.fillText('120 ms', tlX + tlW, tlY + 14);
+
+    // airbag marker at t=0.125
+    const abX = tlX + 0.125 * tlW;
+    ctx.strokeStyle = 'rgba(255,217,77,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(abX, tlY - 10); ctx.lineTo(abX, tlY - 4); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,217,77,0.65)';
+    ctx.fillText('airbag', abX, tlY - 22);
+
+    // peak marker
+    const pkX = tlX + HEAD_PEAK_T * tlW;
+    ctx.strokeStyle = 'rgba(255,217,77,0.5)';
+    ctx.beginPath();
+    ctx.moveTo(pkX, tlY - 10); ctx.lineTo(pkX, tlY - 4); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,217,77,0.65)';
+    ctx.fillText('peak', pkX, tlY - 22);
+
+    ctx.restore();
+  }
+
+  function drawShutterFlash(wallTime) {
+    const age = wallTime - shutterFlashWallTime;
+    if (age < 0 || age > 0.09) return;
+    const alpha = Math.pow(1 - age / 0.09, 1.6);
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,217,77,${0.45 * alpha})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(1.5, 1.5, SCN_W - 3, SCN_H - 3);
+    // inner subtle glow
+    ctx.fillStyle = `rgba(255,217,77,${0.04 * alpha})`;
+    ctx.fillRect(0, 0, SCN_W, SCN_H);
+    ctx.restore();
+  }
+
+  function drawScene(trueT, wallTime) {
+    ctx.clearRect(0, 0, cssW, cssH);
+    drawBackground();
+
+    const scale = Math.min(cssW / SCN_W, cssH / SCN_H);
+    const ox = (cssW - SCN_W * scale) / 2;
+    const oy = (cssH - SCN_H * scale) / 2;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.scale(scale, scale);
+
+    // Quantize to captured frame index
+    const N = Math.max(1, Math.round(currentFps * PHYSICAL_DURATION));
+    const curIdx = Math.min(N, Math.floor(trueT * N + 1e-6));
+    const sampledT = Math.min(1, curIdx / N);
+
+    // Shutter flash trigger on new sample
+    if (curIdx !== lastSampledIdx) {
+      lastSampledIdx = curIdx;
+      shutterFlashWallTime = wallTime;
+    }
+
+    drawWall();
+    drawGroundShadow();
+    drawCarBody();
+    drawDashboard();
+    drawSeat();
+    drawSteering();
+    drawTorso();
+    drawAirbag(sampledT);
+    drawTrajectory(sampledT);
+    drawHead(sampledT);
+    drawTimeline(sampledT);
+    drawShutterFlash(wallTime);
+
+    ctx.restore();
+  }
+
+  // ── LEVER CANVAS (unchanged from ITD-020 v8) ──
+  const leverCanvas = document.getElementById('leverCanvas');
+  const lctx = leverCanvas.getContext('2d');
+  let lW = 0, lH = 0;
+
+  function resizeLever() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = leverCanvas.getBoundingClientRect();
+    lW = rect.width; lH = rect.height;
+    leverCanvas.width = Math.round(lW * dpr);
+    leverCanvas.height = Math.round(lH * dpr);
+    lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function leverGeometry() {
+    const cx = lW / 2;
+    const cy = lH - 36;
+    const L = Math.min(lH - 86, lW * 0.32);
+    const arcR = L + 22;
+    return { cx, cy, L, arcR };
+  }
+
+  function fmtFpsShort(f) {
+    const r = Math.round(f);
+    if (r >= 1000) return (r / 1000).toFixed(r >= 10000 ? 0 : 1).replace('.0','') + 'k';
+    return r.toString();
+  }
+
+  function drawLever() {
+    lctx.clearRect(0, 0, lW, lH);
+    const bg = lctx.createLinearGradient(0, 0, 0, lH);
+    bg.addColorStop(0, '#0f0f13'); bg.addColorStop(1, '#09090c');
+    lctx.fillStyle = bg;
+    lctx.fillRect(0, 0, lW, lH);
+
+    const { cx, cy, L, arcR } = leverGeometry();
+    const plateW = Math.min(lW - 60, 420);
+    const plateX = cx - plateW / 2;
+    const plateY = lH - 54;
+    const plateH = 36;
+    lctx.fillStyle = 'rgba(0,0,0,0.45)';
+    lctx.fillRect(plateX + 3, plateY + plateH - 2, plateW - 6, 10);
+    const plateGrad = lctx.createLinearGradient(0, plateY, 0, plateY + plateH);
+    plateGrad.addColorStop(0, '#2e2e36'); plateGrad.addColorStop(0.5, '#202026'); plateGrad.addColorStop(1, '#141418');
+    lctx.fillStyle = plateGrad;
+    lctx.fillRect(plateX, plateY, plateW, plateH);
+    lctx.fillStyle = 'rgba(255,255,255,0.06)';
+    lctx.fillRect(plateX, plateY, plateW, 1);
+    lctx.fillStyle = 'rgba(0,0,0,0.4)';
+    lctx.fillRect(plateX, plateY + plateH - 1, plateW, 1);
+    lctx.fillStyle = '#404048';
+    for (const px of [plateX + 14, plateX + plateW - 14]) {
+      lctx.beginPath(); lctx.arc(px, plateY + plateH / 2, 3, 0, Math.PI * 2); lctx.fill();
+      lctx.beginPath(); lctx.arc(px - 1, plateY + plateH / 2 - 1, 1, 0, Math.PI * 2);
+      lctx.fillStyle = 'rgba(255,255,255,0.15)'; lctx.fill();
+      lctx.fillStyle = '#404048';
+    }
+
+    lctx.beginPath();
+    const startAng = -Math.PI / 2 + LEVER_MIN_ANG;
+    const endAng   = -Math.PI / 2 + LEVER_MAX_ANG;
+    lctx.arc(cx, cy, arcR, startAng, endAng);
+    lctx.strokeStyle = 'rgba(255,217,77,0.08)';
+    lctx.lineWidth = 18; lctx.lineCap = 'butt';
+    lctx.stroke();
+    lctx.beginPath();
+    lctx.arc(cx, cy, arcR, startAng, endAng);
+    lctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    lctx.lineWidth = 1;
+    lctx.stroke();
+
+    for (const fps of TICK_FPS) {
+      const ang = fpsToAngle(fps);
+      const isNear = Math.abs(currentFps - fps) / fps < 0.04;
+      const vx = Math.sin(ang), vy = -Math.cos(ang);
+      const innerR = arcR - 10;
+      const outerR = arcR + 12;
+      const ix = cx + vx * innerR, iy = cy + vy * innerR;
+      const ox = cx + vx * outerR, oy = cy + vy * outerR;
+      lctx.strokeStyle = isNear ? 'rgba(255,217,77,0.95)' : 'rgba(255,217,77,0.35)';
+      lctx.lineWidth = isNear ? 2.2 : 1.4;
+      lctx.beginPath();
+      lctx.moveTo(ix, iy); lctx.lineTo(ox, oy);
+      lctx.stroke();
+
+      const labelR = arcR + 26;
+      const lx = cx + vx * labelR, ly = cy + vy * labelR;
+      lctx.font = `500 ${isNear ? 11 : 10}px "JetBrains Mono", monospace`;
+      lctx.fillStyle = isNear ? '#ffd94d' : 'rgba(160,160,170,0.6)';
+      lctx.textAlign = 'center';
+      lctx.textBaseline = 'middle';
+      lctx.fillText(fmtFpsShort(fps), lx, ly);
+    }
+
+    const angNow = fpsToAngle(currentFps);
+    const vx = Math.sin(angNow), vy = -Math.cos(angNow);
+
+    lctx.save();
+    lctx.translate(cx, cy); lctx.rotate(angNow);
+    lctx.fillStyle = 'rgba(0,0,0,0.35)';
+    lctx.fillRect(-8, -L, 16, L);
+    const shaftGrad = lctx.createLinearGradient(-6, 0, 6, 0);
+    shaftGrad.addColorStop(0, '#2a2a32'); shaftGrad.addColorStop(0.5, '#8a8a95'); shaftGrad.addColorStop(1, '#2a2a32');
+    lctx.fillStyle = shaftGrad;
+    lctx.fillRect(-5, -L, 10, L);
+    lctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    lctx.lineWidth = 1;
+    lctx.strokeRect(-5, -L, 10, L);
+    lctx.restore();
+
+    const pivotR = 14;
+    lctx.beginPath();
+    lctx.arc(cx, cy, pivotR + 2, 0, Math.PI * 2);
+    lctx.fillStyle = 'rgba(0,0,0,0.6)'; lctx.fill();
+    const pivotGrad = lctx.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, pivotR);
+    pivotGrad.addColorStop(0, '#555560'); pivotGrad.addColorStop(1, '#1a1a20');
+    lctx.fillStyle = pivotGrad;
+    lctx.beginPath(); lctx.arc(cx, cy, pivotR, 0, Math.PI * 2); lctx.fill();
+    lctx.strokeStyle = '#0a0a0c'; lctx.lineWidth = 1; lctx.stroke();
+    lctx.beginPath(); lctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    lctx.fillStyle = '#ffd94d'; lctx.fill();
+
+    const tipX = cx + vx * L;
+    const tipY = cy + vy * L;
+    const knobR = 24;
+    if (dragging) {
+      const glow = lctx.createRadialGradient(tipX, tipY, knobR, tipX, tipY, knobR + 18);
+      glow.addColorStop(0, 'rgba(255,217,77,0.35)');
+      glow.addColorStop(1, 'rgba(255,217,77,0)');
+      lctx.fillStyle = glow;
+      lctx.beginPath(); lctx.arc(tipX, tipY, knobR + 18, 0, Math.PI * 2); lctx.fill();
+    }
+    lctx.beginPath(); lctx.arc(tipX, tipY, knobR, 0, Math.PI * 2);
+    const ringGrad = lctx.createRadialGradient(tipX - 8, tipY - 8, 2, tipX, tipY, knobR);
+    ringGrad.addColorStop(0, '#fff1a5'); ringGrad.addColorStop(0.5, '#ffd94d'); ringGrad.addColorStop(1, '#a07010');
+    lctx.fillStyle = ringGrad; lctx.fill();
+    lctx.beginPath(); lctx.arc(tipX, tipY, knobR - 5, 0, Math.PI * 2);
+    const rubberGrad = lctx.createRadialGradient(tipX - 6, tipY - 6, 2, tipX, tipY, knobR - 5);
+    rubberGrad.addColorStop(0, '#42424c'); rubberGrad.addColorStop(1, '#15151a');
+    lctx.fillStyle = rubberGrad; lctx.fill();
+    lctx.beginPath(); lctx.arc(tipX - 7, tipY - 7, 3.5, 0, Math.PI * 2);
+    lctx.fillStyle = 'rgba(255,255,255,0.5)'; lctx.fill();
+
+    const badge = `${Math.round(currentFps).toLocaleString()} fps`;
+    lctx.font = `600 13px "JetBrains Mono", monospace`;
+    const metrics = lctx.measureText(badge);
+    const bw = metrics.width + 18;
+    const bh = 24;
+    const bx = tipX - bw / 2;
+    const by = tipY - knobR - bh - 8;
+    const bxClamped = Math.max(8, Math.min(lW - bw - 8, bx));
+    lctx.fillStyle = 'rgba(9,9,11,0.9)';
+    lctx.strokeStyle = 'rgba(255,217,77,0.55)';
+    lctx.lineWidth = 1;
+    lctx.beginPath();
+    if (lctx.roundRect) lctx.roundRect(bxClamped, by, bw, bh, 6);
+    else lctx.rect(bxClamped, by, bw, bh);
+    lctx.fill(); lctx.stroke();
+    lctx.fillStyle = '#ffd94d';
+    lctx.textAlign = 'center';
+    lctx.textBaseline = 'middle';
+    lctx.fillText(badge, bxClamped + bw / 2, by + bh / 2);
+  }
+
+  function fmtInterval(ms) {
+    if (ms < 1) return (ms * 1000).toFixed(0) + ' μs';
+    if (ms < 10) return ms.toFixed(2) + ' ms';
+    return ms.toFixed(1) + ' ms';
+  }
+
+  function updateChrome() {
+    const N = Math.max(1, Math.round(currentFps * PHYSICAL_DURATION));
+    document.getElementById('statCapture').textContent = `${Math.round(currentFps).toLocaleString()} fps`;
+    document.getElementById('statFrames').textContent = N.toLocaleString();
+    document.getElementById('statInterval').textContent = fmtInterval(1000 / currentFps);
+    document.querySelectorAll('.preset').forEach(p => {
+      const pf = parseInt(p.dataset.fps);
+      const ratio = currentFps / pf;
+      p.classList.toggle('active', ratio > 0.97 && ratio < 1.03);
+    });
+    drawLever();
+  }
+
+  function animateScene(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.1);
+    lastWall = time;
+    wallTimeNow += dt;
+
+    if (playing) {
+      if (inPauseGap) {
+        pauseGapT += dt;
+        if (pauseGapT >= PAUSE_BETWEEN_LOOPS) {
+          inPauseGap = false; pauseGapT = 0; wallElapsed = 0;
+          lastSampledIdx = -1;       // reset flash on new loop
+        }
+      } else {
+        wallElapsed += dt;
+        if (wallElapsed >= PLAYBACK_DURATION) {
+          wallElapsed = PLAYBACK_DURATION;
+          inPauseGap = true; pauseGapT = 0;
+        }
+      }
+    }
+    let trueT;
+    if (inPauseGap) trueT = 0.0;
+    else trueT = wallElapsed / PLAYBACK_DURATION;
+    trueT = Math.max(0, Math.min(1, trueT));
+    drawScene(trueT, wallTimeNow);
+    sceneAnimId = requestAnimationFrame(animateScene);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!sceneAnimId) { lastWall = 0; sceneAnimId = requestAnimationFrame(animateScene); }
+      } else {
+        if (sceneAnimId) { cancelAnimationFrame(sceneAnimId); sceneAnimId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  function setFps(newFps) {
+    currentFps = Math.max(FPS_MIN, Math.min(FPS_MAX, newFps));
+    lastSampledIdx = -1;             // trigger a flash after lever change
+    updateChrome();
+  }
+
+  function leverAngleFromPoint(mx, my) {
+    const { cx, cy } = leverGeometry();
+    const dx = mx - cx;
+    const dy = cy - my;
+    let angle = Math.atan2(dx, dy);
+    return Math.max(LEVER_MIN_ANG, Math.min(LEVER_MAX_ANG, angle));
+  }
+
+  function getLeverMouse(e) {
+    const rect = leverCanvas.getBoundingClientRect();
+    if (e.touches && e.touches[0]) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function onLeverDown(e) {
+    dragging = true;
+    leverCanvas.classList.add('grabbing');
+    const { x, y } = getLeverMouse(e);
+    const ang = leverAngleFromPoint(x, y);
+    setFps(angleToFps(ang));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onLeverMove(e) {
+    if (!dragging) return;
+    const { x, y } = getLeverMouse(e);
+    const ang = leverAngleFromPoint(x, y);
+    setFps(angleToFps(ang));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onLeverUp() {
+    dragging = false;
+    leverCanvas.classList.remove('grabbing');
+    drawLever();
+  }
+  leverCanvas.addEventListener('mousedown', onLeverDown);
+  window.addEventListener('mousemove', onLeverMove);
+  window.addEventListener('mouseup', onLeverUp);
+  leverCanvas.addEventListener('touchstart', onLeverDown, { passive: false });
+  window.addEventListener('touchmove', onLeverMove, { passive: false });
+  window.addEventListener('touchend', onLeverUp);
+
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => setFps(parseInt(btn.dataset.fps)));
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  function resizeAll() {
+    resizeScene();
+    resizeLever();
+    drawLever();
+  }
+  resizeAll();
+  updateChrome();
+  drawScene(0, 0);
+  window.addEventListener('resize', resizeAll);
+})();
+</script>
+</body>
+</html>
