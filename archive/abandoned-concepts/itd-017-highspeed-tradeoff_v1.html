@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-017: What a High-Speed Camera Buys You</title>
+<meta property="og:title" content="ITD-017: What a High-Speed Camera Buys You">
+<meta property="og:description" content="Time, resolution, record length. Memory fixes the budget. Pick your tradeoff.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --green: #22c55e;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--gold-dim);
+    margin-right: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+
+  .subtitle {
+    font-size: 0.92em;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin: 20px 0;
+    backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+  .panel:nth-of-type(3) { animation-delay: 0.6s; }
+  .panel:nth-of-type(4) { animation-delay: 0.7s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  /* SCENE CANVAS */
+  #sceneCanvas {
+    width: 100%;
+    height: 340px;
+    display: block;
+    border-radius: var(--radius-sm);
+    background: #050506;
+  }
+
+  /* SLIDER ROW */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .slider-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    min-width: 96px;
+  }
+  .slider-wrap {
+    flex: 1;
+    min-width: 180px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .range {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: var(--surface-raised);
+    border-radius: 2px;
+    outline: none;
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--gold);
+    cursor: pointer;
+    border: 3px solid var(--bg);
+    box-shadow: 0 0 8px var(--gold-glow);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .range::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px var(--gold);
+  }
+  .range::-moz-range-track {
+    background: var(--border-hover);
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  .range::-moz-range-thumb {
+    background: var(--gold);
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .range-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.15em;
+    font-weight: 600;
+    color: var(--gold);
+    min-width: 130px;
+    text-align: right;
+    letter-spacing: -0.3px;
+  }
+  .range-unit {
+    font-size: 0.55em;
+    font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  /* READOUT CARDS */
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .readout-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .readout-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+  }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95em;
+    color: var(--text);
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: var(--gold); }
+  .readout-card-value.warn { color: var(--red); }
+  .readout-card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  /* MEMORY BAR */
+  .memory-bar {
+    margin-top: 18px;
+    height: 10px;
+    background: var(--surface-raised);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .memory-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), #fff1a5);
+    width: 0%;
+    transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* PRESET ROW */
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    letter-spacing: 0.3px;
+  }
+  .preset:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .preset.active { border-color: var(--gold); color: var(--gold); background: var(--gold-faint); }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 8px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.75em;
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+  .btn-primary { background: var(--gold); color: var(--bg); }
+  .btn-secondary { background: var(--surface-raised); color: var(--text-dim); border: 1px solid var(--border); }
+
+  /* NOTE */
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p {
+    font-size: 0.88em;
+    color: var(--text);
+    line-height: 1.65;
+  }
+  .note strong { color: #fff; }
+
+  /* SPECS STRIP */
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+  }
+  .spec-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    margin-top: 32px;
+    border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    color: var(--text-muted);
+    letter-spacing: 0.8px;
+  }
+  .itd-footer a {
+    color: var(--gold);
+    text-decoration: none;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #sceneCanvas { height: 260px; }
+    .range-value { font-size: 0.95em; min-width: 100px; }
+    .slider-label { min-width: 72px; font-size: 0.62em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-017 / Interactive Technical Diagram</div>
+  <h1>What a High-Speed Camera Buys You</h1>
+  <div class="subtitle">Time, resolution, and record length. Memory fixes the budget. Pick your tradeoff.</div>
+
+  <!-- PANEL 1: WHAT HIGH SPEED REVEALS -->
+  <div class="panel">
+    <div class="panel-label">What High Speed Reveals</div>
+    <canvas id="sceneCanvas"></canvas>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnPlay">Play</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <!-- PANEL 2: THE TRADEOFF -->
+  <div class="panel">
+    <div class="panel-label">The Tradeoff</div>
+
+    <!-- Frame rate slider -->
+    <div class="slider-row">
+      <span class="slider-label">Frame Rate</span>
+      <div class="slider-wrap">
+        <input type="range" class="range" id="fpsRange" min="0" max="8" step="1" value="3">
+      </div>
+      <div class="range-value" id="fpsValue">1,000 <span class="range-unit">fps</span></div>
+    </div>
+
+    <!-- Resolution slider -->
+    <div class="slider-row">
+      <span class="slider-label">Resolution</span>
+      <div class="slider-wrap">
+        <input type="range" class="range" id="resRange" min="0" max="5" step="1" value="3">
+      </div>
+      <div class="range-value" id="resValue">1280 × 720</div>
+    </div>
+
+    <!-- Memory slider -->
+    <div class="slider-row">
+      <span class="slider-label">Memory</span>
+      <div class="slider-wrap">
+        <input type="range" class="range" id="memRange" min="0" max="4" step="1" value="2">
+      </div>
+      <div class="range-value" id="memValue">32 <span class="range-unit">GB</span></div>
+    </div>
+
+    <!-- Memory fill bar -->
+    <div class="memory-bar"><div class="memory-fill" id="memFill"></div></div>
+
+    <!-- Readout cards -->
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Data Rate</div>
+        <div class="readout-card-value gold" id="cardRate">--</div>
+        <div class="readout-card-sub" id="cardRateSub">12-bit mono</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Record Time</div>
+        <div class="readout-card-value gold" id="cardTime">--</div>
+        <div class="readout-card-sub" id="cardTimeSub">at full memory</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Slow-Mo Factor</div>
+        <div class="readout-card-value" id="cardSlomo">--</div>
+        <div class="readout-card-sub">playback at 30 fps</div>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="preset-row" id="presetRow">
+      <button class="preset" data-fps="1" data-res="5">HD Cinema</button>
+      <button class="preset active" data-fps="3" data-res="3">Broadcast HS</button>
+      <button class="preset" data-fps="5" data-res="2">Lab Science</button>
+      <button class="preset" data-fps="6" data-res="1">Ballistics</button>
+      <button class="preset" data-fps="8" data-res="0">Impact Physics</button>
+    </div>
+  </div>
+
+  <!-- NOTE -->
+  <div class="note">
+    <p>A high-speed camera is not a faster shutter. It is a <strong>three-way budget</strong> between how fast you sample time, how many pixels you resolve in each sample, and how long you can keep recording before memory fills. The sensor, the readout electronics, and the RAM are the physical limits. Every configuration is a choice about which reality you want to capture. You cannot have all three.</p>
+  </div>
+
+  <!-- SPECS -->
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-017</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">High-Speed Tradeoff</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Sliders + Animate</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Author</span>
+      <span class="spec-value">ciamac.com</span>
+    </div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-017 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── STEPS ──
+  const FPS_STEPS      = [60, 240, 500, 1000, 2500, 10000, 25000, 75000, 200000];
+  const RES_STEPS      = [
+    { w: 128,  h: 96,   label: '128 × 96'    },
+    { w: 256,  h: 192,  label: '256 × 192'   },
+    { w: 640,  h: 480,  label: '640 × 480'   },
+    { w: 1280, h: 720,  label: '1280 × 720'  },
+    { w: 1920, h: 1080, label: '1920 × 1080' },
+    { w: 2560, h: 1440, label: '2560 × 1440' },
+  ];
+  const MEM_STEPS      = [8, 16, 32, 64, 128]; // GB
+  const BITS_PER_PIXEL = 12;
+
+  // ── STATE ──
+  let fpsIdx = 3, resIdx = 3, memIdx = 2;
+  let playing = false;
+  let animId = null;
+  let lastTime = 0;
+  let simTime = 0;
+
+  // ── SCENE CANVAS ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let dpr = window.devicePixelRatio || 1;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width  = rect.width  * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // Scene: a droplet impact. Time 0 = release, ~0.33s = splash, ~0.7s = crown peak, ~1.0s = settle.
+  // At 60 fps over ~1s, you see maybe 60 frames. At 25k fps you see 25,000.
+  // We parametrize "revealed detail" by fps: higher fps unlocks finer sub-events.
+  const SCENE_DURATION = 1.2; // seconds of physical event
+
+  function drawScene() {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0, 0, w, h);
+
+    const fps = FPS_STEPS[fpsIdx];
+    const t   = (simTime % SCENE_DURATION) / SCENE_DURATION; // 0..1
+
+    // Floor / surface line (water)
+    const surfaceY = h * 0.72;
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, surfaceY);
+    ctx.lineTo(w, surfaceY);
+    ctx.stroke();
+
+    // Grid hint
+    ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+    for (let x = 0; x < w; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+
+    const cx = w / 2;
+
+    // ── Phase: falling droplet, impact, crown, ripple ──
+    const fall   = Math.min(1, t / 0.28);
+    const crown  = Math.max(0, Math.min(1, (t - 0.28) / 0.22));
+    const settle = Math.max(0, Math.min(1, (t - 0.55) / 0.45));
+
+    // Detail resolution derived from fps: how many sub-features we can see.
+    // Linear-ish in log(fps). At 60 fps: just droplet + splash blob. At 200k: every micro-jet.
+    const logFps = Math.log10(fps);                 // 1.78 .. 5.3
+    const detail = Math.max(0.05, Math.min(1, (logFps - 1.5) / 3.5));
+
+    // Falling droplet (phase 1)
+    if (t < 0.32) {
+      const dropY = (h * 0.08) + (surfaceY - h * 0.08) * fall;
+      // motion blur length inversely tied to detail (slow shutter at low fps = streak)
+      const blurLen = (1 - detail) * 70;
+      const grad = ctx.createLinearGradient(cx, dropY - blurLen, cx, dropY);
+      grad.addColorStop(0, 'rgba(255,217,77,0)');
+      grad.addColorStop(1, 'rgba(255,217,77,0.7)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx, dropY - blurLen);
+      ctx.lineTo(cx, dropY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(cx, dropY, 9, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd94d';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(cx - 2, dropY - 3, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fill();
+    }
+
+    // Impact flash (brief)
+    if (t >= 0.27 && t < 0.34) {
+      const flashA = 1 - (t - 0.27) / 0.07;
+      ctx.beginPath();
+      ctx.arc(cx, surfaceY, 60 * flashA, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,241,165,${0.22 * flashA})`;
+      ctx.fill();
+    }
+
+    // Crown splash
+    if (crown > 0) {
+      const crownH = 90 * crown * (1 - 0.35 * crown);
+      const baseR  = 18 + 70 * crown;
+
+      // Crown rim (bowl shape)
+      ctx.strokeStyle = 'rgba(255,217,77,0.75)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, surfaceY, baseR, crownH * 0.4, 0, Math.PI, 2 * Math.PI);
+      ctx.stroke();
+
+      // Jets: how many we render scales with detail
+      const numJets = Math.round(4 + detail * 24);
+      for (let i = 0; i < numJets; i++) {
+        const ang = (i / numJets) * Math.PI * 2 + crown * 0.3;
+        const jr  = baseR + (detail * 6) * Math.sin(i * 7.3 + simTime * 10);
+        const jx  = cx + Math.cos(ang) * jr;
+        const jy  = surfaceY + Math.sin(ang) * jr * 0.3 - crownH * (0.5 + 0.5 * Math.sin(i * 2.1));
+        const jh  = crownH * (0.55 + 0.45 * Math.abs(Math.sin(i * 1.7)));
+
+        // Jet spike
+        ctx.strokeStyle = `rgba(255,217,77,${0.45 + detail * 0.35})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(jx, surfaceY + Math.sin(ang) * jr * 0.3);
+        ctx.lineTo(jx + (jx - cx) * 0.08, jy);
+        ctx.stroke();
+
+        // Droplet at tip (only visible with detail)
+        if (detail > 0.3) {
+          ctx.beginPath();
+          ctx.arc(jx + (jx - cx) * 0.08, jy, 1.5 + detail * 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,241,165,${detail})`;
+          ctx.fill();
+        }
+      }
+
+      // Central upward jet (Rayleigh jet), only clearly visible at higher fps
+      if (detail > 0.45 && crown > 0.3) {
+        const jetH = crownH * 0.85 * ((crown - 0.3) / 0.7);
+        ctx.strokeStyle = `rgba(255,241,165,${(detail - 0.45) * 1.8})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx, surfaceY);
+        ctx.lineTo(cx, surfaceY - jetH);
+        ctx.stroke();
+        // Pinch-off droplet
+        if (detail > 0.7 && crown > 0.55) {
+          ctx.beginPath();
+          ctx.arc(cx, surfaceY - jetH - 6, 2 + detail * 2, 0, Math.PI * 2);
+          ctx.fillStyle = '#fff1a5';
+          ctx.fill();
+        }
+      }
+    }
+
+    // Ripples (settle)
+    if (settle > 0) {
+      for (let r = 0; r < 3; r++) {
+        const rr = (settle * 160) + r * 28;
+        const a  = (1 - settle) * (1 - r * 0.28);
+        if (a <= 0) continue;
+        ctx.strokeStyle = `rgba(255,217,77,${a * 0.25})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(cx, surfaceY, rr, rr * 0.25, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // HUD
+    ctx.font = `500 11px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#333';
+    ctx.fillText(`${fps.toLocaleString()} fps capture`, 16, 22);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillText(`detail level ${Math.round(detail * 100)}%`, 16, 38);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ffd94d';
+    ctx.font = `600 12px "JetBrains Mono", monospace`;
+    const label = detail < 0.2 ? 'splash blob' :
+                  detail < 0.4 ? 'crown visible' :
+                  detail < 0.6 ? 'jets resolved' :
+                  detail < 0.85 ? 'pinch-off seen' : 'micro-droplets';
+    ctx.fillText(label, w - 16, 22);
+  }
+
+  // ── MATH ──
+  function compute() {
+    const fps     = FPS_STEPS[fpsIdx];
+    const { w, h } = RES_STEPS[resIdx];
+    const memGB   = MEM_STEPS[memIdx];
+
+    // Bytes per pixel at 12-bit packed = 1.5. We use 1.5.
+    const bytesPerFrame = w * h * (BITS_PER_PIXEL / 8);        // bytes
+    const memBytes      = memGB * 1024 * 1024 * 1024;          // GB -> bytes
+    const framesInMem   = memBytes / bytesPerFrame;
+    const recordSec     = framesInMem / fps;
+    const dataRateGBs   = (bytesPerFrame * fps) / (1024 * 1024 * 1024); // GB/s
+    const slomoFactor   = fps / 30; // playback at 30 fps
+
+    return { fps, w, h, memGB, bytesPerFrame, framesInMem, recordSec, dataRateGBs, slomoFactor };
+  }
+
+  function fmtTime(sec) {
+    if (sec >= 3600) return (sec / 3600).toFixed(1) + ' h';
+    if (sec >= 60)   return (sec / 60).toFixed(1) + ' min';
+    if (sec >= 1)    return sec.toFixed(2) + ' s';
+    if (sec >= 0.001) return (sec * 1000).toFixed(1) + ' ms';
+    return (sec * 1e6).toFixed(0) + ' μs';
+  }
+
+  function fmtRate(gbs) {
+    if (gbs >= 1)   return gbs.toFixed(2) + ' GB/s';
+    if (gbs >= 0.001) return (gbs * 1024).toFixed(0) + ' MB/s';
+    return (gbs * 1024 * 1024).toFixed(0) + ' KB/s';
+  }
+
+  function fmtSlomo(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10)   return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+
+  // ── UI UPDATE ──
+  function updateReadouts() {
+    const c = compute();
+
+    document.getElementById('fpsValue').innerHTML = `${c.fps.toLocaleString()} <span class="range-unit">fps</span>`;
+    document.getElementById('resValue').textContent = RES_STEPS[resIdx].label;
+    document.getElementById('memValue').innerHTML = `${c.memGB} <span class="range-unit">GB</span>`;
+
+    document.getElementById('cardRate').textContent = fmtRate(c.dataRateGBs);
+    document.getElementById('cardRateSub').textContent = `${(c.bytesPerFrame / 1024).toFixed(1)} KB/frame, 12-bit mono`;
+
+    const timeEl = document.getElementById('cardTime');
+    timeEl.textContent = fmtTime(c.recordSec);
+    timeEl.classList.toggle('warn', c.recordSec < 0.1);
+
+    document.getElementById('cardSlomo').textContent = fmtSlomo(c.slomoFactor);
+
+    // Memory fill: saturates at 100%. Visual: how much of one-second-at-this-rate the memory holds.
+    // We show (one second worth / memory) inverse — more useful: bar = fraction of memory used per second.
+    const fillPct = Math.min(100, (c.dataRateGBs / c.memGB) * 100);
+    document.getElementById('memFill').style.width = fillPct + '%';
+  }
+
+  function syncPresets() {
+    document.querySelectorAll('.preset').forEach(p => {
+      const pf = parseInt(p.dataset.fps);
+      const pr = parseInt(p.dataset.res);
+      p.classList.toggle('active', pf === fpsIdx && pr === resIdx);
+    });
+  }
+
+  // ── ANIMATION ──
+  function animate(time) {
+    if (!lastTime) lastTime = time;
+    const dt = Math.min((time - lastTime) / 1000, 0.05);
+    lastTime = time;
+    if (playing) simTime += dt * 0.6; // play scene at 0.6x so viewer can read it
+    drawScene();
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) {
+          lastTime = 0;
+          animId = requestAnimationFrame(animate);
+        }
+      } else {
+        if (animId) {
+          cancelAnimationFrame(animId);
+          animId = null;
+        }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── WIRE CONTROLS ──
+  document.getElementById('fpsRange').addEventListener('input', (e) => {
+    fpsIdx = parseInt(e.target.value);
+    updateReadouts();
+    syncPresets();
+  });
+  document.getElementById('resRange').addEventListener('input', (e) => {
+    resIdx = parseInt(e.target.value);
+    updateReadouts();
+    syncPresets();
+  });
+  document.getElementById('memRange').addEventListener('input', (e) => {
+    memIdx = parseInt(e.target.value);
+    updateReadouts();
+  });
+
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      fpsIdx = parseInt(btn.dataset.fps);
+      resIdx = parseInt(btn.dataset.res);
+      document.getElementById('fpsRange').value = fpsIdx;
+      document.getElementById('resRange').value = resIdx;
+      updateReadouts();
+      syncPresets();
+    });
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  document.getElementById('btnReset').addEventListener('click', () => {
+    playing = false;
+    simTime = 0;
+    document.getElementById('btnPlay').textContent = 'Play';
+    drawScene();
+  });
+
+  // ── INIT ──
+  resize();
+  updateReadouts();
+  drawScene();
+  window.addEventListener('resize', () => { resize(); drawScene(); });
+})();
+</script>
+</body>
+</html>

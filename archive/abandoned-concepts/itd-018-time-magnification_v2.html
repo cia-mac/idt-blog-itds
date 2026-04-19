@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-018: A Magnifying Glass for Time</title>
+<meta property="og:title" content="ITD-018: A Magnifying Glass for Time">
+<meta property="og:description" content="An electric spark flashes in 2 ms. A high-speed camera stretches those 2 ms into seconds you can actually watch.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --red: #ef4444;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh;
+    position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 960px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.6em, 4vw, 2.1em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.92em; color: var(--text-dim); max-width: 560px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 28px; margin: 20px 0; backdrop-filter: blur(20px);
+    transition: border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .panel:hover { border-color: var(--border-hover); }
+  .panel:nth-of-type(1) { animation-delay: 0.4s; }
+  .panel:nth-of-type(2) { animation-delay: 0.5s; }
+
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-muted); margin-bottom: 16px;
+    display: flex; align-items: center;
+  }
+  .panel-label::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--gold);
+    margin-right: 8px; box-shadow: 0 0 6px var(--gold-glow);
+  }
+
+  #sceneCanvas { width: 100%; height: 360px; display: block; border-radius: var(--radius-sm); background: #040405; }
+
+  .timeline-wrap { margin-top: 18px; user-select: none; -webkit-user-select: none; }
+  .timeline-ticks {
+    position: relative; height: 28px;
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); overflow: hidden;
+    cursor: ew-resize;
+  }
+  .tl-frame { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,217,77,0.45); pointer-events: none; }
+  .tl-frame.sparse { width: 2px; background: rgba(255,217,77,0.9); }
+  .tl-cursor {
+    position: absolute; top: -4px; bottom: -4px; width: 2px;
+    background: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.7);
+    pointer-events: none;
+    transition: left 0.02s linear;
+  }
+  .tl-row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px; }
+  .tl-axis {
+    display: flex; justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em; color: var(--gold); margin-top: 4px;
+  }
+  .tl-axis .scale-label { color: var(--text-muted); font-weight: 400; font-size: 0.85em; margin-right: 4px; }
+
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .slider-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted); min-width: 110px;
+  }
+  .slider-wrap { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 12px; }
+  .range {
+    flex: 1; -webkit-appearance: none;
+    height: 4px; background: var(--surface-raised); border-radius: 2px; outline: none;
+  }
+  .range::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--gold); cursor: pointer; border: 3px solid var(--bg);
+    box-shadow: 0 0 8px var(--gold-glow);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .range::-webkit-slider-thumb:hover { transform: scale(1.1); box-shadow: 0 0 16px var(--gold); }
+  .range::-moz-range-track { background: var(--border-hover); height: 4px; border: none; border-radius: 2px; }
+  .range::-moz-range-thumb { background: var(--gold); border: none; width: 16px; height: 16px; border-radius: 50%; cursor: pointer; }
+  .range-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.15em; font-weight: 600; color: var(--gold);
+    min-width: 130px; text-align: right; letter-spacing: -0.3px;
+  }
+  .range-unit { font-size: 0.55em; font-weight: 400; color: var(--text-dim); letter-spacing: 0.5px; }
+
+  .preset-row { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em; padding: 6px 12px;
+    border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--surface-raised); color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset:hover { border-color: var(--border-hover); color: var(--text); transform: translateY(-1px); }
+  .preset.active { border-color: var(--gold); color: var(--gold); background: var(--gold-faint); }
+
+  .readout-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 18px; }
+  .readout-card {
+    background: var(--surface-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .readout-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1em; color: var(--text); min-height: 20px;
+  }
+  .readout-card-value.gold { color: var(--gold); }
+  .readout-card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; color: var(--text-muted); margin-top: 3px;
+  }
+
+  .controls { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .btn {
+    font-family: 'JetBrains Mono', monospace; border: none;
+    padding: 8px 20px; border-radius: var(--radius-sm); cursor: pointer;
+    font-weight: 600; font-size: 0.75em; letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-primary { background: var(--gold); color: var(--bg); }
+  .btn-secondary { background: var(--surface-raised); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 16px 20px; margin: 20px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .note p { font-size: 0.88em; color: var(--text); line-height: 1.65; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 24px;
+    padding: 18px 0; border-top: 1px solid var(--border); margin-top: 24px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em; color: var(--gold);
+  }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr; }
+    #sceneCanvas { height: 300px; }
+    .range-value { font-size: 0.95em; min-width: 100px; }
+    .slider-label { min-width: 90px; font-size: 0.62em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-018 / Interactive Technical Diagram</div>
+  <h1>A Magnifying Glass for Time</h1>
+  <div class="subtitle">An electric spark jumps the gap in 2 milliseconds. Your eye registers a single flash. A high-speed camera stretches those 2 ms into seconds you can actually watch. Drag to feel the magnification.</div>
+
+  <!-- PANEL 1: SCENE + TIMELINE -->
+  <div class="panel">
+    <div class="panel-label">Electric Arc Discharge · 2 ms event</div>
+    <canvas id="sceneCanvas"></canvas>
+
+    <div class="timeline-wrap">
+      <div class="timeline-ticks" id="timelineTicks">
+        <div class="tl-cursor" id="tlCursor" style="left:0%"></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-axis"><span class="scale-label">real</span><span id="tlRealStart">0 μs</span></div>
+        <div class="tl-axis"><span id="tlRealNow">0 μs</span><span class="scale-label" style="margin-left:4px">now</span></div>
+        <div class="tl-axis"><span id="tlRealEnd">2000 μs</span><span class="scale-label" style="margin-left:4px">real</span></div>
+      </div>
+      <div class="tl-row">
+        <div class="tl-axis"><span class="scale-label">viewer</span><span id="tlViewStart">0 s</span></div>
+        <div class="tl-axis"><span id="tlViewNow">0.0 s</span><span class="scale-label" style="margin-left:4px">now</span></div>
+        <div class="tl-axis"><span id="tlViewEnd">0.33 s</span><span class="scale-label" style="margin-left:4px">viewer</span></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnPlay">Pause</button>
+      <button class="btn btn-secondary" id="btnReset">Reset</button>
+    </div>
+  </div>
+
+  <!-- PANEL 2: FRAME RATE + READOUTS -->
+  <div class="panel">
+    <div class="panel-label">Capture Rate</div>
+    <div class="slider-row">
+      <span class="slider-label">Frame Rate</span>
+      <div class="slider-wrap">
+        <input type="range" class="range" id="fpsRange" min="0" max="7" step="1" value="4">
+      </div>
+      <div class="range-value" id="fpsValue">5,000 <span class="range-unit">fps</span></div>
+    </div>
+    <div class="preset-row" id="presetRow">
+      <button class="preset" data-idx="0">60 (phone)</button>
+      <button class="preset" data-idx="1">240</button>
+      <button class="preset" data-idx="2">1,000</button>
+      <button class="preset" data-idx="3">2,500</button>
+      <button class="preset active" data-idx="4">5,000</button>
+      <button class="preset" data-idx="5">10,000</button>
+      <button class="preset" data-idx="6">15,000</button>
+      <button class="preset" data-idx="7">20,000</button>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Magnification</div>
+        <div class="readout-card-value gold" id="cardMag">166×</div>
+        <div class="readout-card-sub">playback at 30 fps</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Viewer Duration</div>
+        <div class="readout-card-value gold" id="cardDur">0.33 s</div>
+        <div class="readout-card-sub">2 ms → stretched</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Frames Captured</div>
+        <div class="readout-card-value" id="cardFrames">10</div>
+        <div class="readout-card-sub">the white ticks above</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p>A magnifying glass bends light to stretch space. A high-speed camera captures dense time samples and replays them slowly to stretch <strong>time</strong>. Same principle, different dimension. Capture rate divided by 30 fps playback gives you the magnification factor. At 5,000 fps you are watching the spark 166× larger than it happened. At 20,000 fps, 666×. The physical event is always the same 2 milliseconds. What changes is how much of it you can perceive.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-018</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Time Magnification</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Slider + Scrub</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-018 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.002; // 2 ms
+  const PLAYBACK_FPS      = 30;
+  const FPS_STEPS         = [60, 240, 1000, 2500, 5000, 10000, 15000, 20000];
+
+  // ── STATE ──
+  let fpsIdx = 4;
+  let playing = true;
+  let animId = null;
+  let lastWall = 0;
+  let wallElapsed = 0;
+  let scrubT = 0;
+  let scrubbing = false;
+
+  // ── CANVAS ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ── ARC SCENE: fractal lightning between two electrodes ──
+  const ARC_SRC_W = 400;
+  const ARC_SRC_H = 240;
+
+  function createRng(seed) {
+    let s = seed;
+    return () => {
+      s = (s * 9301 + 49297) % 233280;
+      return s / 233280;
+    };
+  }
+
+  // Midpoint-displacement fractal path
+  function fractalPath(rng, x1, y1, x2, y2, disp, detail) {
+    let points = [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+    let d = disp;
+    for (let iter = 0; iter < detail; iter++) {
+      const next = [];
+      for (let j = 0; j < points.length - 1; j++) {
+        const p1 = points[j], p2 = points[j + 1];
+        next.push(p1);
+        const mx = (p1.x + p2.x) / 2 + (rng() - 0.5) * d;
+        const my = (p1.y + p2.y) / 2 + (rng() - 0.5) * d * 0.25;
+        next.push({ x: mx, y: my });
+      }
+      next.push(points[points.length - 1]);
+      points = next;
+      d *= 0.55;
+    }
+    return points;
+  }
+
+  function pointsToSegments(points, startT, endT) {
+    const segs = [];
+    const n = points.length - 1;
+    for (let i = 0; i < n; i++) {
+      const frac = i / Math.max(1, n - 1);
+      const formTime = startT + frac * (endT - startT);
+      segs.push({ p1: points[i], p2: points[i + 1], formTime });
+    }
+    return segs;
+  }
+
+  function generateArc() {
+    const rng = createRng(42);
+    const xTop = ARC_SRC_W / 2;
+    const xBot = ARC_SRC_W / 2 + 10;
+    const yTop = 24;
+    const yBot = ARC_SRC_H - 24;
+
+    // Main bolt (formation 0 → 0.55)
+    const mainPts = fractalPath(rng, xTop, yTop, xBot, yBot, 120, 5);
+    const segments = pointsToSegments(mainPts, 0.0, 0.55);
+
+    // Branches: 5 tributaries, peel off main bolt at various points
+    const NUM_BRANCHES = 5;
+    for (let b = 0; b < NUM_BRANCHES; b++) {
+      const startIdx = Math.floor(4 + rng() * (mainPts.length - 10));
+      const startP = mainPts[startIdx];
+      const side = rng() < 0.5 ? -1 : 1;
+      const angle = side * (Math.PI * 0.25 + rng() * Math.PI * 0.25); // 45-90 deg
+      const length = 40 + rng() * 80;
+      const endX = startP.x + Math.cos(angle) * length * side * -1;
+      const endY = startP.y + Math.abs(Math.sin(angle)) * length;
+      const branchStartT = Math.min(0.55, (startIdx / mainPts.length) * 0.55 + 0.02);
+      const branchEndT = Math.min(0.6, branchStartT + 0.05);
+      const branchPts = fractalPath(rng, startP.x, startP.y, endX, endY, 30, 3);
+      const branchSegs = pointsToSegments(branchPts, branchStartT, branchEndT);
+      for (const s of branchSegs) segments.push(s);
+    }
+
+    return segments;
+  }
+
+  const arcSegments = generateArc();
+
+  function drawElectrodes(rx, ry, scale) {
+    // Top electrode
+    ctx.fillStyle = '#2a2a30';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 30) * scale, ry - 2, 60 * scale, 24 * scale);
+    ctx.fillStyle = '#1a1a1f';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 30) * scale, ry + 18 * scale, 60 * scale, 4 * scale);
+    // Bottom electrode
+    ctx.fillStyle = '#2a2a30';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 30) * scale, ry + (ARC_SRC_H - 22) * scale, 60 * scale, 24 * scale);
+    ctx.fillStyle = '#1a1a1f';
+    ctx.fillRect(rx + (ARC_SRC_W / 2 - 30) * scale, ry + (ARC_SRC_H - 26) * scale, 60 * scale, 4 * scale);
+  }
+
+  function phaseBrightness(t) {
+    // Fade in on formation, peak at ~0.7, decay to end
+    if (t < 0.6) return Math.min(1, t / 0.4);
+    if (t < 0.78) return 1;
+    if (t < 1.0) return Math.max(0, 1 - (t - 0.78) / 0.22);
+    return 0;
+  }
+
+  function drawArc(rect, t) {
+    const scale = Math.min(rect.w / ARC_SRC_W, rect.h / ARC_SRC_H);
+    const rx = rect.x + (rect.w - ARC_SRC_W * scale) / 2;
+    const ry = rect.y + (rect.h - ARC_SRC_H * scale) / 2;
+
+    drawElectrodes(rx, ry, scale);
+
+    const overall = phaseBrightness(t);
+    if (overall <= 0) return;
+
+    // Arc corona glow (when bright)
+    if (overall > 0.3) {
+      const cx = rx + ARC_SRC_W * scale / 2;
+      const cy = ry + ARC_SRC_H * scale / 2;
+      const rad = 80 * scale * overall;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      grad.addColorStop(0, `rgba(255,241,165,${0.12 * overall})`);
+      grad.addColorStop(1, 'rgba(255,241,165,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(rx - 20, ry - 20, ARC_SRC_W * scale + 40, ARC_SRC_H * scale + 40);
+    }
+
+    // Layer 1: outer gold glow
+    ctx.lineCap = 'round';
+    for (const seg of arcSegments) {
+      if (t < seg.formTime) continue;
+      const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+      const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+      ctx.strokeStyle = `rgba(255,217,77,${0.18 * overall})`;
+      ctx.lineWidth = Math.max(3, 9 * scale);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    // Layer 2: mid warm
+    for (const seg of arcSegments) {
+      if (t < seg.formTime) continue;
+      const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+      const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+      ctx.strokeStyle = `rgba(255,241,165,${0.7 * overall})`;
+      ctx.lineWidth = Math.max(1.4, 3.5 * scale);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    // Layer 3: white core
+    for (const seg of arcSegments) {
+      if (t < seg.formTime) continue;
+      const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+      const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+      ctx.strokeStyle = `rgba(255,255,255,${0.95 * overall})`;
+      ctx.lineWidth = Math.max(0.9, 1.6 * scale);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+
+    // Leader tip spark (just forming segment)
+    for (const seg of arcSegments) {
+      const age = t - seg.formTime;
+      if (age > 0 && age < 0.04) {
+        const x1 = rx + seg.p1.x * scale, y1 = ry + seg.p1.y * scale;
+        const x2 = rx + seg.p2.x * scale, y2 = ry + seg.p2.y * scale;
+        const tipX = x1 + (x2 - x1);
+        const tipY = y1 + (y2 - y1);
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, Math.max(2, 4 * scale), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${0.9 * (1 - age / 0.04)})`;
+        ctx.fill();
+      }
+    }
+
+    // Impact flash on bottom electrode at peak
+    if (t >= 0.6 && t < 0.85) {
+      const flashA = 1 - Math.abs(t - 0.72) / 0.13;
+      if (flashA > 0) {
+        const fx = rx + (ARC_SRC_W / 2 + 10) * scale;
+        const fy = ry + (ARC_SRC_H - 24) * scale;
+        ctx.beginPath();
+        ctx.arc(fx, fy, 32 * scale * flashA, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,241,165,${0.4 * flashA})`;
+        ctx.fill();
+      }
+    }
+  }
+
+  function drawScene(t) {
+    // Background
+    ctx.clearRect(0, 0, cssW, cssH);
+    const bg = ctx.createRadialGradient(cssW / 2, cssH / 2, 20, cssW / 2, cssH / 2, cssW * 0.7);
+    bg.addColorStop(0, '#07070a');
+    bg.addColorStop(1, '#040406');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    drawArc({ x: 0, y: 0, w: cssW, h: cssH }, t);
+
+    // HUD
+    const fps = FPS_STEPS[fpsIdx];
+    ctx.font = `500 11px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(200,200,208,0.55)';
+    ctx.fillText(`captured at ${fps.toLocaleString()} fps`, 16, 22);
+
+    ctx.fillStyle = 'rgba(136,136,136,0.55)';
+    const physicalUs = (t * PHYSICAL_DURATION * 1e6).toFixed(0);
+    ctx.fillText(`event clock: ${physicalUs} μs`, 16, 38);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#ffd94d';
+    ctx.font = `600 12px "JetBrains Mono", monospace`;
+    const phase = t < 0.05 ? 'quiescent' :
+                  t < 0.45 ? 'step leader descending' :
+                  t < 0.62 ? 'bolt complete' :
+                  t < 0.82 ? 'return stroke peak' :
+                              'decaying';
+    ctx.fillText(phase, cssW - 16, 22);
+  }
+
+  // ── MATH ──
+  function getMagnification()   { return FPS_STEPS[fpsIdx] / PLAYBACK_FPS; }
+  function getViewerDuration()  { return PHYSICAL_DURATION * getMagnification(); }
+  function getFramesCaptured()  { return FPS_STEPS[fpsIdx] * PHYSICAL_DURATION; }
+
+  function fmtDuration(sec) {
+    if (sec >= 60) return (sec / 60).toFixed(1) + ' min';
+    if (sec >= 1) return sec.toFixed(2) + ' s';
+    if (sec >= 0.001) return (sec * 1000).toFixed(1) + ' ms';
+    return (sec * 1e6).toFixed(0) + ' μs';
+  }
+  function fmtMag(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10) return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+  function fmtFrames(n) {
+    if (n < 1) return 'fewer than 1';
+    if (n < 10) return n.toFixed(1);
+    return Math.round(n).toLocaleString();
+  }
+
+  // ── UI ──
+  function updateReadouts() {
+    const fps = FPS_STEPS[fpsIdx];
+    document.getElementById('fpsValue').innerHTML = `${fps.toLocaleString()} <span class="range-unit">fps</span>`;
+    document.getElementById('cardMag').textContent    = fmtMag(getMagnification());
+    document.getElementById('cardDur').textContent    = fmtDuration(getViewerDuration());
+    document.getElementById('cardFrames').textContent = fmtFrames(getFramesCaptured());
+
+    document.getElementById('tlRealEnd').textContent = (PHYSICAL_DURATION * 1e6) + ' μs';
+    document.getElementById('tlViewEnd').textContent = fmtDuration(getViewerDuration());
+
+    document.getElementById('fpsRange').value = fpsIdx;
+    document.querySelectorAll('.preset').forEach(p => {
+      p.classList.toggle('active', parseInt(p.dataset.idx) === fpsIdx);
+    });
+
+    rebuildFrameTicks();
+    updateTimelineReadouts();
+  }
+
+  function rebuildFrameTicks() {
+    const host = document.getElementById('timelineTicks');
+    Array.from(host.querySelectorAll('.tl-frame')).forEach(n => n.remove());
+    const framesCount = getFramesCaptured();
+    const nVisible = Math.min(200, Math.max(1, Math.round(framesCount)));
+    const sparse = framesCount < 20;
+    for (let i = 0; i < nVisible; i++) {
+      const t = (i + 0.5) / nVisible;
+      const el = document.createElement('div');
+      el.className = 'tl-frame' + (sparse ? ' sparse' : '');
+      el.style.left = (t * 100) + '%';
+      host.appendChild(el);
+    }
+  }
+
+  function updateTimelineReadouts() {
+    document.getElementById('tlCursor').style.left = (scrubT * 100) + '%';
+    const realUs = (scrubT * PHYSICAL_DURATION * 1e6).toFixed(0);
+    const viewS  = scrubT * getViewerDuration();
+    document.getElementById('tlRealNow').textContent = realUs + ' μs';
+    document.getElementById('tlViewNow').textContent = fmtDuration(viewS);
+  }
+
+  // ── SCRUB ──
+  const timeline = document.getElementById('timelineTicks');
+  function scrubTo(clientX) {
+    const rect = timeline.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    scrubT = x / rect.width;
+    wallElapsed = scrubT * getViewerDuration();
+    updateTimelineReadouts();
+    drawScene(scrubT);
+  }
+  timeline.addEventListener('mousedown', (e) => {
+    scrubbing = true;
+    playing = false;
+    document.getElementById('btnPlay').textContent = 'Play';
+    scrubTo(e.clientX);
+  });
+  window.addEventListener('mousemove', (e) => { if (scrubbing) scrubTo(e.clientX); });
+  window.addEventListener('mouseup', () => { scrubbing = false; });
+  timeline.addEventListener('touchstart', (e) => {
+    scrubbing = true;
+    playing = false;
+    document.getElementById('btnPlay').textContent = 'Play';
+    scrubTo(e.touches[0].clientX);
+    e.preventDefault();
+  }, { passive: false });
+  window.addEventListener('touchmove', (e) => { if (scrubbing && e.touches[0]) scrubTo(e.touches[0].clientX); });
+  window.addEventListener('touchend', () => { scrubbing = false; });
+
+  // ── ANIMATION ──
+  function animate(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.05);
+    lastWall = time;
+    if (playing) {
+      wallElapsed += dt;
+      const vd = getViewerDuration();
+      if (wallElapsed >= vd) wallElapsed = wallElapsed % vd;
+      scrubT = wallElapsed / vd;
+    }
+    drawScene(scrubT);
+    updateTimelineReadouts();
+    animId = requestAnimationFrame(animate);
+  }
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastWall = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  document.getElementById('fpsRange').addEventListener('input', (e) => {
+    fpsIdx = parseInt(e.target.value);
+    wallElapsed = scrubT * getViewerDuration();
+    updateReadouts();
+  });
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      fpsIdx = parseInt(btn.dataset.idx);
+      wallElapsed = scrubT * getViewerDuration();
+      updateReadouts();
+    });
+  });
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+  document.getElementById('btnReset').addEventListener('click', () => {
+    wallElapsed = 0; scrubT = 0;
+    playing = true;
+    document.getElementById('btnPlay').textContent = 'Pause';
+    updateTimelineReadouts();
+    drawScene(0);
+  });
+
+  // ── INIT ──
+  resize();
+  updateReadouts();
+  drawScene(0);
+  window.addEventListener('resize', () => { resize(); drawScene(scrubT); });
+})();
+</script>
+</body>
+</html>
