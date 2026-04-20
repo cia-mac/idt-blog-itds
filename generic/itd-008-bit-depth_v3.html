@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-008: Bit Depth and Dynamic Range</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.88em;
+    color: #666;
+    margin-bottom: 28px;
+  }
+  .subtitle span {
+    color: #E8B600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  /* ── GRADIENT CANVAS ── */
+  #gradientCanvas {
+    width: 100%;
+    height: 280px;
+    display: block;
+    border-radius: 8px;
+  }
+
+  /* ── HISTOGRAM CANVAS ── */
+  #histCanvas {
+    width: 100%;
+    height: 140px;
+    display: block;
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+
+  /* ── BIT DEPTH SLIDER ── */
+  .bit-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .bit-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #444;
+  }
+  .bit-slider-wrap {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .bit-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .bit-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 3px solid #0c0c0c;
+    box-shadow: 0 0 8px rgba(232,182,0,0.3);
+  }
+  input[type="range"]::-moz-range-track {
+    background: #333;
+    height: 4px;
+    border: none;
+    border-radius: 2px;
+  }
+  input[type="range"]::-moz-range-thumb {
+    background: #E8B600;
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .bit-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.4em;
+    font-weight: 600;
+    color: #E8B600;
+    min-width: 90px;
+    text-align: right;
+    letter-spacing: -0.5px;
+  }
+  .bit-unit {
+    font-size: 0.55em;
+    font-weight: 400;
+    color: #666;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── PRESETS ── */
+  .preset-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .preset {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em;
+    padding: 5px 12px;
+    border-radius: 5px;
+    border: 1px solid #1e1e1e;
+    background: #141414;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .preset:hover { border-color: #333; color: #888; }
+  .preset.active { border-color: #E8B600; color: #E8B600; background: rgba(232,182,0,0.06); }
+
+  /* ── READOUT CARDS ── */
+  .readout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .readout-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .readout-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .readout-card-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: #ccc;
+    min-height: 20px;
+  }
+  .readout-card-value.gold { color: #E8B600; }
+
+  /* ── TOGGLE ── */
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 12px;
+  }
+  .toggle-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+    margin-right: 6px;
+  }
+  .toggle-group {
+    display: flex;
+    gap: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    padding: 7px 16px;
+    cursor: pointer;
+    background: #141414;
+    color: #555;
+    border: none;
+    transition: background 0.2s, color 0.2s;
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .chip:hover { background: #1a1a1a; color: #888; }
+  .chip.active { background: #E8B600; color: #0c0c0c; font-weight: 600; }
+
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+  }
+  .note p {
+    font-size: 0.82em;
+    color: #888;
+    line-height: 1.65;
+  }
+  .note strong { color: #bbb; }
+
+  .specs-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 14px 0;
+    border-top: 1px solid #1a1a1a;
+    margin-top: 20px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 2px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+  }
+  .spec-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em;
+    color: #E8B600;
+  }
+
+  @media (max-width: 600px) {
+    .readout-grid { grid-template-columns: 1fr 1fr; }
+    #gradientCanvas { height: 220px; }
+    #histCanvas { height: 100px; }
+    .bit-value { font-size: 1.1em; min-width: 70px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Bit Depth and Dynamic Range</h1>
+  <div class="subtitle">More bits per pixel means more shades between black and white. <span>ITD-008</span></div>
+
+  <!-- GRADIENT DISPLAY -->
+  <div class="panel">
+    <div class="panel-label">Quantized Gradient</div>
+    <canvas id="gradientCanvas"></canvas>
+    <canvas id="histCanvas"></canvas>
+  </div>
+
+  <!-- BIT DEPTH CONTROL -->
+  <div class="panel">
+    <div class="panel-label">Bit Depth</div>
+    <div class="bit-row">
+      <span class="bit-label">Depth</span>
+      <div class="bit-slider-wrap">
+        <input type="range" class="bit-slider" id="bitSlider" min="0" max="4" step="1" value="0">
+      </div>
+      <div class="bit-value" id="bitValue">1 <span class="bit-unit">bit</span></div>
+    </div>
+    <div class="preset-row" id="presetRow">
+      <button class="preset active" data-idx="0">1-bit</button>
+      <button class="preset" data-idx="1">2-bit</button>
+      <button class="preset" data-idx="2">4-bit</button>
+      <button class="preset" data-idx="3">8-bit</button>
+      <button class="preset" data-idx="4">12-bit</button>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-group-label">View</span>
+      <div class="toggle-group" id="viewToggle">
+        <button class="chip active" data-view="gradient">Gradient</button>
+        <button class="chip" data-view="scene">Scene</button>
+      </div>
+    </div>
+
+    <div class="readout-grid">
+      <div class="readout-card">
+        <div class="readout-card-label">Tonal Levels</div>
+        <div class="readout-card-value gold" id="cardLevels">2</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Dynamic Range</div>
+        <div class="readout-card-value" id="cardDR">6 dB</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Stops of Light</div>
+        <div class="readout-card-value" id="cardStops">1</div>
+      </div>
+      <div class="readout-card">
+        <div class="readout-card-label">Banding</div>
+        <div class="readout-card-value" id="cardBanding">Extreme</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <p>A <strong>1-bit</strong> image has 2 levels: black and white. An <strong>8-bit</strong> image has 256 levels, enough for most display purposes but not for post-production. A <strong>12-bit</strong> image has 4,096 levels, providing headroom to adjust exposure, recover highlights, and push shadows without introducing visible stepping artifacts. In high-speed imaging, 12-bit capture preserves detail in both the bright flash of an explosion and the dark interior of a vehicle cabin within the same frame. The difference is invisible in a properly exposed thumbnail but becomes obvious the moment you grade the footage.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item">
+      <span class="spec-label">Series</span>
+      <span class="spec-value">ITD-008</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Topic</span>
+      <span class="spec-value">Quantization</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Interaction</span>
+      <span class="spec-value">Slider + Toggle</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Source</span>
+      <span class="spec-value">idtcameras.com</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── BIT STEPS ──
+  const BIT_STEPS = [1, 2, 4, 8, 12];
+
+  // ── STATE ──
+  let currentBitIdx = 0;
+  let viewMode = 'gradient'; // gradient | scene
+  let animId = null;
+  let lastTime = 0;
+  let time = 0;
+
+  // ── CANVASES ──
+  const gCanvas = document.getElementById('gradientCanvas');
+  const gCtx = gCanvas.getContext('2d');
+  const hCanvas = document.getElementById('histCanvas');
+  const hCtx = hCanvas.getContext('2d');
+
+  // ── DPR (cached) ──
+  let dpr = window.devicePixelRatio || 1;
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    for (const [cvs, ctx_] of [[gCanvas, gCtx], [hCanvas, hCtx]]) {
+      const rect = cvs.getBoundingClientRect();
+      cvs.width = rect.width * dpr;
+      cvs.height = rect.height * dpr;
+      ctx_.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
+
+  // ── QUANTIZE ──
+  function quantize(value01, bits) {
+    const levels = Math.pow(2, bits);
+    return Math.floor(value01 * (levels - 1)) / (levels - 1);
+  }
+
+  // ── DRAW GRADIENT VIEW ──
+  function drawGradient() {
+    const w = gCanvas.getBoundingClientRect().width;
+    const h = gCanvas.getBoundingClientRect().height;
+    gCtx.clearRect(0, 0, w, h);
+
+    const bits = BIT_STEPS[currentBitIdx];
+    const levels = Math.pow(2, bits);
+    const margin = 20;
+    const gradH = h - 70;
+    const gradW = w - margin * 2;
+    const gradY = 30;
+
+    // Title
+    gCtx.font = `500 10px "JetBrains Mono", monospace`;
+    gCtx.fillStyle = '#333';
+    gCtx.textAlign = 'left';
+    gCtx.fillText(`${bits}-bit quantization: ${levels.toLocaleString()} levels`, margin, 18);
+
+    if (viewMode === 'gradient') {
+      // Draw quantized gradient bar
+      // Top half: smooth reference (very thin)
+      const refH = 8;
+      for (let x = 0; x < gradW; x++) {
+        const t = x / gradW;
+        const v = Math.round(t * 255);
+        gCtx.fillStyle = `rgb(${v},${v},${v})`;
+        gCtx.fillRect(margin + x, gradY, 1, refH);
+      }
+      gCtx.font = `400 7px "JetBrains Mono", monospace`;
+      gCtx.fillStyle = '#333';
+      gCtx.textAlign = 'right';
+      gCtx.fillText('REF', margin - 4, gradY + refH - 1);
+
+      // Main quantized gradient
+      const mainY = gradY + refH + 4;
+      const mainH = gradH - refH - 4;
+
+      for (let x = 0; x < gradW; x++) {
+        const t = x / gradW;
+        const q = quantize(t, bits);
+        const v = Math.round(q * 255);
+        gCtx.fillStyle = `rgb(${v},${v},${v})`;
+        gCtx.fillRect(margin + x, mainY, 1, mainH);
+      }
+
+      // Step markers for low bit depths
+      if (bits <= 4) {
+        gCtx.strokeStyle = 'rgba(232,182,0,0.2)';
+        gCtx.lineWidth = 1;
+        gCtx.setLineDash([2, 3]);
+        for (let i = 1; i < levels; i++) {
+          const sx = margin + (i / levels) * gradW;
+          gCtx.beginPath();
+          gCtx.moveTo(sx, mainY);
+          gCtx.lineTo(sx, mainY + mainH);
+          gCtx.stroke();
+        }
+        gCtx.setLineDash([]);
+      }
+
+      // Level labels at extremes
+      gCtx.font = `500 9px "JetBrains Mono", monospace`;
+      gCtx.fillStyle = '#555';
+      gCtx.textAlign = 'left';
+      gCtx.fillText('0', margin, mainY + mainH + 14);
+      gCtx.textAlign = 'center';
+      gCtx.fillText(`${levels - 1}`, margin + gradW, mainY + mainH + 14);
+      gCtx.fillText(`${Math.floor(levels / 2)}`, margin + gradW / 2, mainY + mainH + 14);
+
+      // Banding indicator
+      if (bits <= 4) {
+        const bandWidth = gradW / levels;
+        gCtx.font = `400 8px "JetBrains Mono", monospace`;
+        gCtx.fillStyle = '#E8B600';
+        gCtx.textAlign = 'center';
+        gCtx.fillText(`Band width: ${Math.round(bandWidth)}px`, margin + gradW / 2, mainY + mainH + 28);
+      }
+
+    } else {
+      // Scene view: simulated high-contrast scene
+      drawScene(gCtx, margin, gradY, gradW, gradH, bits);
+    }
+  }
+
+  // ── DRAW SCENE (shaded ball moving across a gradient backdrop) ──
+  // Bit-depth quantization shows up in two places:
+  //   - the smooth gradient background bands into visible strips at low bits
+  //   - the spherical ball shading posterizes into concentric rings at low bits
+  function drawScene(ctx, x, y, w, h, bits) {
+    const step = 3;
+    const invW = 1 / w;
+    const invH = 1 / h;
+
+    // Ball moves left-right in a slow sinusoid; small vertical bob adds life.
+    const ballR = Math.min(w, h) * 0.22;
+    const marginX = ballR * 1.1;
+    const ballX = marginX + (w - marginX * 2) * (0.5 + 0.5 * Math.sin(time * 1.1));
+    const ballY = h * 0.55 + Math.sin(time * 2.2) * ballR * 0.12;
+    const ballR2 = ballR * ballR;
+
+    // Light direction (upper-left), pre-normalized
+    const lmX = -0.55, lmY = -0.65, lmZ = 0.52;
+    const lMag = Math.sqrt(lmX * lmX + lmY * lmY + lmZ * lmZ);
+    const lx = lmX / lMag, ly_ = lmY / lMag, lz = lmZ / lMag;
+
+    // Soft shadow on the "ground" beneath the ball (flattened ellipse)
+    const shadowCX = ballX;
+    const shadowCY = ballY + ballR * 0.98;
+    const shadowRX = ballR * 0.85;
+    const shadowRY = ballR * 0.22;
+
+    for (let px = 0; px < w; px += step) {
+      const nx = px * invW;
+      const blockW = Math.min(step, w - px);
+      const bdx = px - ballX;
+      const bdx2 = bdx * bdx;
+      const sdxN = (px - shadowCX) / shadowRX;
+      const sdxN2 = sdxN * sdxN;
+
+      for (let py = 0; py < h; py += step) {
+        const ny = py * invH;
+
+        // Background: radial gradient bright upper-right to dark lower-left
+        const rx = 1 - nx;
+        const ryy = ny;
+        let brightness = 0.82 - Math.sqrt(rx * rx + ryy * ryy * 0.9) * 0.72;
+
+        // Soft shadow on the floor
+        const sdyN = (py - shadowCY) / shadowRY;
+        const sd2 = sdxN2 + sdyN * sdyN;
+        if (sd2 < 1) {
+          const shadowStrength = (1 - sd2) * 0.55;
+          brightness *= (1 - shadowStrength);
+        }
+
+        // Ball: smooth spherical shading (Lambert + tiny specular)
+        const bdy = py - ballY;
+        const bd2 = bdx2 + bdy * bdy;
+        if (bd2 < ballR2) {
+          const nnx = bdx / ballR;
+          const nny = bdy / ballR;
+          const nnz = Math.sqrt(Math.max(0, 1 - nnx * nnx - nny * nny));
+          const diffuse = Math.max(0, nnx * lx + nny * ly_ + nnz * lz);
+          const highlight = Math.pow(diffuse, 28) * 0.18;
+          brightness = 0.08 + diffuse * 0.82 + highlight;
+        }
+
+        // Clamp and quantize
+        if (brightness < 0) brightness = 0;
+        else if (brightness > 1) brightness = 1;
+        const q = quantize(brightness, bits);
+        const v = Math.round(q * 255);
+
+        const blockH = Math.min(step, h - py);
+        ctx.fillStyle = `rgb(${v},${v},${v})`;
+        ctx.fillRect(x + px, y + py, blockW, blockH);
+      }
+    }
+
+    // Labels
+    ctx.font = `500 9px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    if (bits <= 4) {
+      ctx.fillStyle = 'rgba(217,64,64,0.7)';
+      ctx.fillText('Banding in background; posterized ball shading', x + 4, y + h - 8);
+    } else if (bits >= 12) {
+      ctx.fillStyle = 'rgba(64,176,96,0.7)';
+      ctx.fillText('Smooth gradient, continuous ball shading', x + 4, y + h - 8);
+    }
+  }
+
+  // ── DRAW HISTOGRAM ──
+  function drawHistogram() {
+    const w = hCanvas.getBoundingClientRect().width;
+    const h = hCanvas.getBoundingClientRect().height;
+    hCtx.clearRect(0, 0, w, h);
+
+    const bits = BIT_STEPS[currentBitIdx];
+    const levels = Math.pow(2, bits);
+    const margin = 20;
+    const plotW = w - margin * 2;
+    const plotH = h - 30;
+    const plotY = 14;
+
+    // Title
+    hCtx.font = `500 9px "JetBrains Mono", monospace`;
+    hCtx.fillStyle = '#333';
+    hCtx.textAlign = 'left';
+    hCtx.fillText('Value Distribution', margin, 10);
+
+    hCtx.textAlign = 'right';
+    hCtx.fillStyle = '#2a2a2a';
+    hCtx.fillText(`${levels.toLocaleString()} possible values`, w - margin, 10);
+
+    // Baseline
+    hCtx.strokeStyle = '#1e1e1e';
+    hCtx.lineWidth = 1;
+    hCtx.beginPath();
+    hCtx.moveTo(margin, plotY + plotH);
+    hCtx.lineTo(margin + plotW, plotY + plotH);
+    hCtx.stroke();
+
+    // Generate histogram from gradient
+    const bins = Math.min(levels, 256);
+    const counts = new Array(bins).fill(0);
+    const gW = gCanvas.getBoundingClientRect().width - 40;
+    for (let x = 0; x < gW; x++) {
+      const t = x / gW;
+      const q = quantize(t, bits);
+      const bin = Math.min(Math.floor(q * (bins - 1)), bins - 1);
+      counts[bin]++;
+    }
+
+    const maxCount = Math.max(...counts, 1);
+    const barW = Math.max(1, plotW / bins - (bins <= 16 ? 2 : 0));
+    const barGap = bins <= 16 ? 2 : 0;
+
+    for (let i = 0; i < bins; i++) {
+      const barH = (counts[i] / maxCount) * plotH * 0.85;
+      const bx = margin + (i / bins) * plotW;
+      const brightness = i / (bins - 1);
+      const v = Math.round(brightness * 200) + 55;
+
+      // Bar
+      hCtx.fillStyle = counts[i] > 0 ? `rgba(232,182,0,${0.3 + brightness * 0.5})` : '#1a1a1a';
+      hCtx.fillRect(bx, plotY + plotH - barH, barW, barH);
+    }
+
+    // Labels
+    hCtx.font = `400 8px "JetBrains Mono", monospace`;
+    hCtx.fillStyle = '#444';
+    hCtx.textAlign = 'left';
+    hCtx.fillText('Black', margin, plotY + plotH + 12);
+    hCtx.textAlign = 'right';
+    hCtx.fillText('White', margin + plotW, plotY + plotH + 12);
+
+    // Level count indicator for low bits
+    if (bits <= 4) {
+      hCtx.textAlign = 'center';
+      hCtx.fillStyle = '#E8B600';
+      hCtx.font = `500 8px "JetBrains Mono", monospace`;
+      hCtx.fillText(`${levels} discrete bars = ${levels} tonal values`, margin + plotW / 2, plotY + plotH + 12);
+    }
+  }
+
+  function updateCards() {
+    const bits = BIT_STEPS[currentBitIdx];
+    const levels = Math.pow(2, bits);
+    const dr = bits * 6.02; // dB
+    const stops = bits;
+
+    document.getElementById('cardLevels').textContent = levels.toLocaleString();
+    document.getElementById('cardDR').textContent = `${dr.toFixed(0)} dB`;
+    document.getElementById('cardStops').textContent = stops;
+
+    let banding = 'None';
+    if (bits <= 1) banding = 'Extreme';
+    else if (bits <= 2) banding = 'Severe';
+    else if (bits <= 4) banding = 'Visible';
+    else if (bits <= 8) banding = 'Minimal';
+    else banding = 'Imperceptible';
+    document.getElementById('cardBanding').textContent = banding;
+  }
+
+  // ── ANIMATION ──
+  function animate(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = (ts - lastTime) / 1000;
+    lastTime = ts;
+    time += dt;
+
+    drawGradient();
+    drawHistogram();
+    animId = requestAnimationFrame(animate);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!animId) { lastTime = 0; animId = requestAnimationFrame(animate); }
+      } else {
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(gCanvas);
+
+  // ── CONTROLS ──
+  const bitSlider = document.getElementById('bitSlider');
+  bitSlider.addEventListener('input', () => {
+    setBit(parseInt(bitSlider.value));
+  });
+
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      setBit(idx);
+      bitSlider.value = idx;
+    });
+  });
+
+  function setBit(idx) {
+    currentBitIdx = idx;
+    const bits = BIT_STEPS[idx];
+    document.getElementById('bitValue').innerHTML = `${bits} <span class="bit-unit">bit</span>`;
+
+    document.querySelectorAll('.preset').forEach(p => p.classList.remove('active'));
+    const activePreset = document.querySelector(`.preset[data-idx="${idx}"]`);
+    if (activePreset) activePreset.classList.add('active');
+
+    updateCards();
+  }
+
+  // View toggle
+  document.querySelectorAll('#viewToggle .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#viewToggle .chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      viewMode = chip.dataset.view;
+    });
+  });
+
+  // ── INIT ──
+  resize();
+  updateCards();
+  window.addEventListener('resize', resize);
+})();
+</script>
+</body>
+</html>

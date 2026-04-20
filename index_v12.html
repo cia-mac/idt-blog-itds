@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Technical Diagrams</title>
+<meta property="og:title" content="Interactive Technical Diagrams">
+<meta property="og:description" content="Visual explanations of how high-speed cameras and imaging systems actually work. Self-contained interactive diagrams.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .hero { max-width: 1400px; margin: 0 auto; padding: 96px 40px 0; position: relative; z-index: 1; }
+  .hero::before {
+    content: ''; position: absolute; top: 0; left: 50%;
+    transform: translateX(-50%); width: 900px; height: 500px;
+    background: radial-gradient(ellipse at center, var(--gold-faint) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .hero-count::before { content: ''; display: inline-block; width: 32px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+  .hero h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(2.4em, 6vw, 4em); font-weight: 700;
+    color: #fff; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 24px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .hero h1 em { font-style: normal; color: var(--gold); }
+  .hero-sub {
+    font-size: 1.1em; color: var(--text-dim); max-width: 640px;
+    line-height: 1.7; margin-bottom: 64px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .section-divider {
+    max-width: 1400px; margin: 0 auto 32px; padding: 0 40px;
+    display: flex; align-items: baseline; gap: 16px;
+    position: relative; z-index: 1;
+  }
+  .section-divider .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: var(--gold); white-space: nowrap;
+  }
+  .section-divider .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-muted); white-space: nowrap;
+  }
+  .section-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+    margin-left: 8px;
+  }
+
+  .featured { max-width: 1400px; margin: 0 auto 64px; padding: 0 40px; position: relative; z-index: 1; }
+  .featured-card {
+    display: grid; grid-template-columns: 1.4fr 1fr;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+    text-decoration: none; color: inherit;
+    transition: border-color 0.4s, box-shadow 0.4s;
+    cursor: pointer; backdrop-filter: blur(20px);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  .featured-card:hover { border-color: var(--border-hover); box-shadow: 0 12px 60px rgba(255,217,77,0.06); }
+  .featured-preview {
+    position: relative; min-height: 440px;
+    background: #0a0a0a; overflow: hidden;
+  }
+  .featured-preview iframe {
+    width: 200%; height: 200%;
+    transform: scale(0.5); transform-origin: top left;
+    border: none; pointer-events: none;
+  }
+  .featured-preview .card-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(9,9,11,0.4));
+    z-index: 2;
+  }
+  .featured-body { padding: 48px 44px; display: flex; flex-direction: column; justify-content: center; }
+  .featured-body .card-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: var(--gold); margin-bottom: 14px;
+  }
+  .featured-body .card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 2em; font-weight: 700; color: #fff;
+    margin-bottom: 16px; letter-spacing: -0.5px;
+  }
+  .featured-body .card-desc { font-size: 1em; color: var(--text-dim); line-height: 1.75; margin-bottom: 28px; }
+  .card-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+  .featured-cta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78em; color: var(--gold);
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 24px; letter-spacing: 0.5px;
+  }
+  .featured-cta::after { content: '\2192'; transition: transform 0.3s; font-size: 1.1em; }
+  .featured-card:hover .featured-cta::after { transform: translateX(6px); }
+
+  .gallery {
+    max-width: 1400px; margin: 0 auto 64px; padding: 0 40px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;
+    position: relative; z-index: 1;
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+    transition: border-color 0.4s, transform 0.4s, box-shadow 0.4s;
+    cursor: pointer; text-decoration: none; color: inherit;
+    display: block; position: relative; backdrop-filter: blur(20px);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .gallery .card:nth-child(1)  { animation-delay: 0.05s; }
+  .gallery .card:nth-child(2)  { animation-delay: 0.10s; }
+  .gallery .card:nth-child(3)  { animation-delay: 0.15s; }
+  .gallery .card:nth-child(4)  { animation-delay: 0.20s; }
+  .gallery .card:nth-child(5)  { animation-delay: 0.25s; }
+  .gallery .card:nth-child(6)  { animation-delay: 0.30s; }
+  .gallery .card:nth-child(7)  { animation-delay: 0.35s; }
+  .gallery .card:nth-child(8)  { animation-delay: 0.40s; }
+  .gallery .card:nth-child(9)  { animation-delay: 0.45s; }
+  .gallery .card:nth-child(10) { animation-delay: 0.50s; }
+  .card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 40px rgba(255,217,77,0.05);
+  }
+
+  .card-preview { width: 100%; height: 300px; background: #0a0a0a; position: relative; overflow: hidden; }
+  .card-preview iframe {
+    width: 200%; height: 200%;
+    transform: scale(0.5); transform-origin: top left;
+    border: none; pointer-events: none;
+  }
+  .card-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(9,9,11,0.3));
+    z-index: 2; transition: background 0.4s;
+  }
+  .card:hover .card-overlay {
+    background: linear-gradient(to bottom, transparent 50%, rgba(9,9,11,0.1));
+  }
+
+  .card-badge {
+    position: absolute; top: 16px; left: 16px; z-index: 3;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 600; letter-spacing: 0.5px;
+    color: var(--gold); background: rgba(9,9,11,0.85);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid rgba(255,217,77,0.15);
+  }
+  .card-badge.new { color: var(--bg); background: var(--gold); border-color: transparent; }
+
+  .card-body { padding: 24px 28px 28px; }
+  .card-title {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.25em; font-weight: 600;
+    color: var(--text); margin-bottom: 8px; letter-spacing: -0.3px;
+  }
+  .card:hover .card-title { color: #fff; }
+  .card-desc { font-size: 0.92em; color: var(--text-dim); line-height: 1.65; }
+  .card-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65em; padding: 4px 10px; border-radius: 5px;
+    background: var(--surface-raised); color: var(--text-muted);
+    letter-spacing: 0.3px; border: 1px solid var(--border);
+    transition: color 0.3s, border-color 0.3s;
+  }
+  .card:hover .tag { color: var(--text-dim); border-color: var(--border-hover); }
+
+  .section-blurb {
+    max-width: 1400px; margin: 0 auto 28px;
+    padding: 0 40px; font-size: 0.95em; color: var(--text-dim);
+    position: relative; z-index: 1;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .section-blurb > p { max-width: 640px; }
+
+  .footer {
+    max-width: 1400px; margin: 0 auto; padding: 40px 40px 72px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em; color: var(--text-muted);
+    position: relative; z-index: 1;
+  }
+  .footer-left { display: flex; align-items: center; gap: 24px; }
+  .footer-stat { display: flex; flex-direction: column; gap: 3px; }
+  .footer-stat-val { color: var(--text-dim); font-weight: 600; font-size: 1.2em; }
+  .footer-stat-label { font-size: 0.85em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .footer-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); }
+  .footer-right a { color: var(--gold); text-decoration: none; transition: color 0.3s; }
+  .footer-right a:hover { color: #fff1a5; }
+
+  @media (max-width: 1000px) {
+    .hero { padding: 64px 28px 0; }
+    .hero h1 { font-size: 2.6em; }
+    .featured { padding: 0 28px; }
+    .featured-card { grid-template-columns: 1fr; }
+    .featured-preview { min-height: 300px; }
+    .featured-body { padding: 32px 28px; }
+    .featured-body .card-title { font-size: 1.6em; }
+    .gallery { grid-template-columns: 1fr; padding: 0 28px; }
+    .card-preview { height: 280px; }
+    .section-divider, .section-blurb { padding: 0 28px; }
+    .footer { padding: 32px 28px 56px; }
+  }
+  @media (max-width: 600px) {
+    .hero { padding: 48px 20px 0; }
+    .hero h1 { font-size: 2em; }
+    .hero-sub { font-size: 1em; }
+    .featured { padding: 0 20px; }
+    .featured-body { padding: 24px 20px; }
+    .featured-body .card-title { font-size: 1.3em; }
+    .gallery { padding: 0 20px; }
+    .card-preview { height: 220px; }
+    .card-body { padding: 20px; }
+    .section-divider, .section-blurb { padding: 0 20px; }
+    .footer { padding: 24px 20px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-count">16 Interactive Diagrams</div>
+  <h1>How High-Speed<br>Cameras <em>Actually</em> Work</h1>
+  <p class="hero-sub">Visual explanations of the engineering behind high-speed imaging. Each diagram is self-contained, interactive, and built with zero dependencies.</p>
+</div>
+
+<!-- FEATURED -->
+<div class="section-divider">
+  <span class="label">Featured</span>
+  <span class="meta">ITD-020 · New</span>
+</div>
+
+<div class="featured">
+  <a class="featured-card" href="generic/itd-020-slow-motion_v8.html">
+    <div class="featured-preview">
+      <iframe src="generic/itd-020-slow-motion_v8.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="featured-body">
+      <div class="card-number">ITD-020 · New</div>
+      <div class="card-title">What Slow Motion Actually Is</div>
+      <div class="card-desc">A bullet passes through an apple in 5 milliseconds. Pull the physical lever to any frame rate from 60 up to 20,000 fps and watch what was always there. Lever pivots through an arc with tick-marks at the eight presets. The apple ruptures, particles arc under gravity, and the slow-motion factor scales from 2× up to 666×.</div>
+      <div class="card-tags">
+        <span class="tag">Slow Motion</span>
+        <span class="tag">Physical Lever</span>
+        <span class="tag">Bullet Through Apple</span>
+      </div>
+      <div class="featured-cta">Open diagram</div>
+    </div>
+  </a>
+</div>
+
+<!-- GENERIC SECTION -->
+<div class="section-divider">
+  <span class="label">Generic</span>
+  <span class="meta">10 diagrams · concept-first</span>
+</div>
+<div class="section-blurb"><p>Diagrams that teach a concept end-to-end without assuming any specific camera. Safe to share anywhere.</p></div>
+
+<div class="gallery">
+
+  <a class="card" href="generic/itd-020-slow-motion_v8.html">
+    <div class="card-preview">
+      <span class="card-badge new">020 · New</span>
+      <iframe src="generic/itd-020-slow-motion_v8.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">What Slow Motion Actually Is</div>
+      <div class="card-desc">Bullet through apple, 5 ms event. A physical lever swings through an arc of frame rates from 60 to 20,000 fps. Presets snap, continuous dragging reads the slow-motion factor live.</div>
+      <div class="card-tags">
+        <span class="tag">Slow Motion</span>
+        <span class="tag">Lever</span>
+        <span class="tag">Ballistics</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-014-hdr_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">014</span>
+      <iframe src="generic/itd-014-hdr_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">High Dynamic Range</div>
+      <div class="card-desc">Side-by-side standard vs HDR scene. Bit depth presets, exposure slider, histogram with clipping visualization.</div>
+      <div class="card-tags">
+        <span class="tag">HDR</span>
+        <span class="tag">Clipping</span>
+        <span class="tag">Histogram</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-013-trigger-modes_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">013</span>
+      <iframe src="generic/itd-013-trigger-modes_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Trigger Modes</div>
+      <div class="card-desc">Circular ring buffer with animated write head. Start, center, and end trigger modes. See how pre and post-trigger frames are allocated.</div>
+      <div class="card-tags">
+        <span class="tag">Ring Buffer</span>
+        <span class="tag">Pre-Trigger</span>
+        <span class="tag">Capture</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-011-temporal-resolution_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">011</span>
+      <iframe src="generic/itd-011-temporal-resolution_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Temporal Resolution</div>
+      <div class="card-desc">Bouncing ball sampled at different frame rates. FPS slider from 24 to 15,000. Gap distance indicators show what gets lost between samples.</div>
+      <div class="card-tags">
+        <span class="tag">Frame Rate</span>
+        <span class="tag">Sampling</span>
+        <span class="tag">Aliasing</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-009-exposure-blur_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">009</span>
+      <iframe src="generic/itd-009-exposure-blur_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Exposure Time vs. Motion Blur</div>
+      <div class="card-desc">Spinning disc at 3,000 RPM. Adjust exposure from 1/30s to 1/50,000s and watch angular blur dissolve. Light collection tradeoff visible.</div>
+      <div class="card-tags">
+        <span class="tag">Shutter Speed</span>
+        <span class="tag">Angular Blur</span>
+        <span class="tag">Light</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-008-bit-depth_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">008</span>
+      <iframe src="generic/itd-008-bit-depth_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Bit Depth and Dynamic Range</div>
+      <div class="card-desc">Quantized gradient from 1-bit to 12-bit. Toggle between gradient bar and a shaded ball moving across a radial backdrop. Histogram shows discrete tonal distribution.</div>
+      <div class="card-tags">
+        <span class="tag">Quantization</span>
+        <span class="tag">Dynamic Range</span>
+        <span class="tag">Banding</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-007-sensor-readout_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">007</span>
+      <iframe src="generic/itd-007-sensor-readout_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Sensor Readout Modes</div>
+      <div class="card-desc">Animated pixel grid showing rolling vs global shutter and FSI vs BSI illumination. Timing diagram reveals readout skew.</div>
+      <div class="card-tags">
+        <span class="tag">Global Shutter</span>
+        <span class="tag">BSI</span>
+        <span class="tag">Sensor</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-006-stereo-piv_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">006</span>
+      <iframe src="generic/itd-006-stereo-piv_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Stereo PIV Setup</div>
+      <div class="card-desc">Flow channel with draggable cameras. Stereo vs volumetric modes. Baseline and convergence controls drive the triangulation geometry.</div>
+      <div class="card-tags">
+        <span class="tag">PIV</span>
+        <span class="tag">Stereo</span>
+        <span class="tag">Triangulation</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-003-state-machine_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">003</span>
+      <iframe src="generic/itd-003-state-machine_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Camera State Machine</div>
+      <div class="card-desc">Six operational states from idle to reset. The autonomous capture lifecycle, animated.</div>
+      <div class="card-tags">
+        <span class="tag">Automation</span>
+        <span class="tag">Trigger Logic</span>
+        <span class="tag">State</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="generic/itd-002-sdi-signal-path_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">002</span>
+      <iframe src="generic/itd-002-sdi-signal-path_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">SDI Signal Path</div>
+      <div class="card-desc">The seven-stage journey from motion detection to broadcast output. Before and after firmware comparison.</div>
+      <div class="card-tags">
+        <span class="tag">Broadcast</span>
+        <span class="tag">3G-SDI</span>
+        <span class="tag">Signal</span>
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<!-- IDT-SPECIFIC SECTION -->
+<div class="section-divider">
+  <span class="label">IDT-Specific</span>
+  <span class="meta">6 diagrams · product-aware</span>
+</div>
+<div class="section-blurb"><p>Diagrams that name IDT cameras or IDT-proprietary features. These belong with the IDT blog pipeline.</p></div>
+
+<div class="gallery">
+
+  <a class="card" href="idt-specific/itd-016-xslink-hub_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">016</span>
+      <iframe src="idt-specific/itd-016-xslink-hub_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">XSLink Hub Bridging</div>
+      <div class="card-desc">USB-C to fiber aggregation. Add cameras, watch packet animations flow through hubs to the processor. Overflow detection.</div>
+      <div class="card-tags">
+        <span class="tag">XSLink</span>
+        <span class="tag">Fiber</span>
+        <span class="tag">Aggregation</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="idt-specific/itd-015-xdr_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">015</span>
+      <iframe src="idt-specific/itd-015-xdr_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">XDR: Extended Dynamic Range</div>
+      <div class="card-desc">Multi-slope integration within a single frame. Compare Standard, Double, Dual, and Triple XDR modes. Animated timing diagram.</div>
+      <div class="card-tags">
+        <span class="tag">XDR</span>
+        <span class="tag">Multi-Slope</span>
+        <span class="tag">Sensor Mode</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="idt-specific/itd-012-connection-topology_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">012</span>
+      <iframe src="idt-specific/itd-012-connection-topology_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Connection Topology</div>
+      <div class="card-desc">Drag-and-drop system builder. Add cameras, hubs, processors. Validates GPU requirements, port capacity, and connection compatibility.</div>
+      <div class="card-tags">
+        <span class="tag">System Design</span>
+        <span class="tag">Fiber / USB-C</span>
+        <span class="tag">Drag &amp; Drop</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="idt-specific/itd-010-pixel-size_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">010</span>
+      <iframe src="idt-specific/itd-010-pixel-size_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Pixel Size and Light Sensitivity</div>
+      <div class="card-desc">Side-by-side pixel wells with photon rain simulation. Compare six real IDT sensors from 2.5 to 11.6 microns.</div>
+      <div class="card-tags">
+        <span class="tag">Pixel Pitch</span>
+        <span class="tag">Well Depth</span>
+        <span class="tag">Photon Count</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="idt-specific/itd-005-camera-placement_v4.html">
+    <div class="card-preview">
+      <span class="card-badge">005</span>
+      <iframe src="idt-specific/itd-005-camera-placement_v4.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">Camera Placement</div>
+      <div class="card-desc">Top-down crash test layout. Drag cameras, rotate FOV cones, measure coverage in real time.</div>
+      <div class="card-tags">
+        <span class="tag">Crash Test</span>
+        <span class="tag">FOV</span>
+        <span class="tag">Draggable</span>
+      </div>
+    </div>
+  </a>
+
+  <a class="card" href="idt-specific/itd-004-fps-resolution_v5.html">
+    <div class="card-preview">
+      <span class="card-badge">004</span>
+      <iframe src="idt-specific/itd-004-fps-resolution_v5.html" loading="lazy" tabindex="-1"></iframe>
+      <div class="card-overlay"></div>
+    </div>
+    <div class="card-body">
+      <div class="card-title">FPS vs. Resolution</div>
+      <div class="card-desc">13 camera families, 47 modes. See how sensor cropping enables higher frame rates across the IDT lineup.</div>
+      <div class="card-tags">
+        <span class="tag">Sensor Crop</span>
+        <span class="tag">Frame Rate</span>
+        <span class="tag">47 Modes</span>
+      </div>
+    </div>
+  </a>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">
+    <div class="footer-stat">
+      <span class="footer-stat-val">16</span>
+      <span class="footer-stat-label">Diagrams</span>
+    </div>
+    <div class="footer-dot"></div>
+    <div class="footer-stat">
+      <span class="footer-stat-val">0</span>
+      <span class="footer-stat-label">Dependencies</span>
+    </div>
+    <div class="footer-dot"></div>
+    <div class="footer-stat">
+      <span class="footer-stat-val">HTML</span>
+      <span class="footer-stat-label">Self-contained</span>
+    </div>
+  </div>
+  <div class="footer-right">Built by <a href="https://ciamac.com">Ciamac Parhizi</a></div>
+</div>
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 ---
-workflow_step: itd_021_in_index_v13_pending_live_review
+workflow_step: itd_021_rejected_v12_remains_live_gallery
 agent_type: execute
 token_budget: deep
 last_updated: 2026-04-19
@@ -40,7 +40,7 @@ Shipped, committed, featured in the live gallery. Pivoting arc lever, continuous
   - v1: first pass. Scene composition weak (detached airbag, invisible torso, head floating). Peak-excursion error stat was a dud (≤ 0.2 mm at 60 fps) because the chosen peak time 0.72 coincided with the 5/7 sample.
   - v2: redrew scene as car cabin cross-section, added wall + wheels + windshield tint, recolored head to muted gray so gold reads as measurement overlay only, swapped stat to "Between Samples," added shutter-flash vignette.
   - v3: lowered `HEAD_REST_Y` from 162 → 176 so head no longer clips roof (148), brightened torso fill `#2c2c34` → `#3a3a44` for legibility against cabin window tint.
-- **Not yet in gallery.** Prototype. Gallery inclusion deferred to next session after live review.
+- **REJECTED after live review (2026-04-19).** The measurement-ruler framing did not land. Files (v1, v2, v3) remain in the repo and remain committed. `index_v13.html` was prepared to add ITD-021 to the Generic grid but was not promoted. **Live gallery is `index_v12.html`** (no ITD-021 card). A future session could either iterate to v4 with a different angle or leave the prototype as a reference.
 
 ### ITD-008 parallel work (outside this Claude session)
 

@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITD-021: How Crash Tests Are Actually Measured</title>
+<meta property="og:title" content="ITD-021: How Crash Tests Are Actually Measured">
+<meta property="og:description" content="50 ms of crash. Impact, airbag deploy, dummy kinematics. Pull the lever to any frame rate from 60 up to 20,000.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #ffd94d;
+    --gold-dim: rgba(255,217,77,0.5);
+    --gold-glow: rgba(255,217,77,0.12);
+    --gold-faint: rgba(255,217,77,0.04);
+    --bg: #09090b;
+    --surface: #0f0f12;
+    --surface-raised: #131318;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.1);
+    --text: #c8c8d0;
+    --text-dim: #6a6a78;
+    --text-muted: #3e3e4a;
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7; overflow-x: hidden; min-height: 100vh; position: relative;
+  }
+  body::after {
+    content: ''; position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/></svg>");
+    pointer-events: none; z-index: 9999; opacity: 0.5; mix-blend-mode: overlay;
+  }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .container { max-width: 1040px; margin: 0 auto; padding: 48px 24px 64px; position: relative; z-index: 1; }
+
+  .itd-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 2.5px;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    display: inline-flex; align-items: center; margin-bottom: 14px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.1s backwards;
+  }
+  .itd-tag::before { content: ''; display: inline-block; width: 24px; height: 1px; background: var(--gold-dim); margin-right: 12px; }
+
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(1.7em, 4.5vw, 2.3em); font-weight: 700;
+    color: #fff; letter-spacing: -0.5px; margin-bottom: 10px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards;
+  }
+  .subtitle {
+    font-size: 0.95em; color: var(--text-dim); max-width: 620px; margin-bottom: 32px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s backwards;
+  }
+
+  .stage {
+    position: relative;
+    background: #0a0a0d;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s backwards;
+  }
+  #sceneCanvas { width: 100%; height: 540px; display: block; background: #0a0a0d; }
+  .stage-controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 16px 20px;
+    background: linear-gradient(to top, rgba(9,9,11,0.96) 40%, rgba(9,9,11,0));
+    display: flex; align-items: center; gap: 14px;
+    z-index: 2;
+  }
+  .btn-play {
+    font-family: 'JetBrains Mono', monospace;
+    border: none; padding: 10px 22px;
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-weight: 700; font-size: 0.78em; letter-spacing: 0.6px;
+    background: var(--gold); color: var(--bg);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn-play:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* LEVER PANEL */
+  .lever-panel {
+    position: relative;
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.5s backwards;
+  }
+  .lever-panel-label {
+    position: absolute;
+    top: 14px; left: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--gold);
+    z-index: 2;
+    pointer-events: none;
+  }
+  #leverCanvas {
+    width: 100%;
+    height: 260px;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #leverCanvas.grabbing { cursor: grabbing; }
+
+  /* STATS STRIP */
+  .stats-strip {
+    display: grid; grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 12px; margin-top: 16px;
+    padding: 18px 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius);
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.55s backwards;
+  }
+  .stat { display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+  .stat:first-child { align-items: flex-start; text-align: left; }
+  .stat:last-child { align-items: flex-end; text-align: right; }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1.4px;
+    color: var(--text-muted);
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95em; font-weight: 600;
+    color: var(--text); letter-spacing: -0.3px;
+  }
+  .stat-hero .stat-label { color: var(--gold-dim); }
+  .stat-hero .stat-value {
+    font-size: clamp(1.6em, 3.5vw, 2.4em); font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #fff1a5);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    letter-spacing: -1px; line-height: 1;
+  }
+
+  /* PRESETS */
+  .preset-grid-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px;
+    color: var(--gold); margin: 28px 0 12px;
+    display: flex; align-items: center; gap: 12px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.6s backwards;
+  }
+  .preset-grid-label::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+  }
+  .preset-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 10px; margin-bottom: 20px;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.65s backwards;
+  }
+  .preset {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 18px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative; overflow: hidden; min-height: 92px;
+  }
+  .preset:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .preset.active {
+    border-color: var(--gold);
+    background: var(--gold-faint);
+    box-shadow: 0 4px 24px rgba(255,217,77,0.12);
+  }
+  .preset.active::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top, rgba(255,217,77,0.06), transparent 70%);
+    pointer-events: none;
+  }
+  .preset-fps {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.45em; font-weight: 700;
+    color: var(--text); letter-spacing: -0.8px; line-height: 1.1;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset-fps .unit {
+    font-size: 0.55em; font-weight: 500;
+    color: var(--text-dim); margin-left: 4px; letter-spacing: 0;
+  }
+  .preset-ctx {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62em; font-weight: 500;
+    color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1.2px; margin-top: 8px;
+    transition: color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .preset:hover .preset-fps { color: #fff; }
+  .preset.active .preset-fps { color: var(--gold); }
+  .preset.active .preset-fps .unit { color: rgba(255,217,77,0.55); }
+  .preset.active .preset-ctx { color: rgba(255,217,77,0.75); }
+
+  .note {
+    background: var(--gold-faint);
+    border-left: 2px solid rgba(255,217,77,0.2);
+    padding: 18px 22px; margin: 24px 0 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.7s backwards;
+  }
+  .note p { font-size: 0.92em; color: var(--text); line-height: 1.7; }
+  .note strong { color: #fff; }
+
+  .specs-strip {
+    display: flex; flex-wrap: wrap; gap: 28px;
+    padding: 22px 0; border-top: 1px solid var(--border); margin-top: 28px;
+  }
+  .spec-item { display: flex; flex-direction: column; gap: 3px; }
+  .spec-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.58em; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .spec-value { font-family: 'JetBrains Mono', monospace; font-size: 0.78em; color: var(--gold); }
+
+  .itd-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 24px; margin-top: 32px; border-top: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em; color: var(--text-muted); letter-spacing: 0.8px;
+  }
+  .itd-footer a { color: var(--gold); text-decoration: none; transition: color 0.3s; }
+  .itd-footer a:hover { color: #fff1a5; }
+
+  @media (max-width: 900px) {
+    .preset-grid { grid-template-columns: repeat(2, 1fr); }
+    .preset-fps { font-size: 1.3em; }
+  }
+  @media (max-width: 700px) {
+    #sceneCanvas { height: 420px; }
+    #leverCanvas { height: 220px; }
+    .stats-strip { grid-template-columns: 1fr; gap: 14px; padding: 14px 18px; }
+    .stat, .stat:first-child, .stat:last-child { align-items: center; text-align: center; }
+    .preset { min-height: 82px; padding: 14px 10px; }
+    .preset-fps { font-size: 1.2em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="itd-tag">ITD-021 / Interactive Technical Diagram</div>
+  <h1>How Crash Tests Are Actually Measured</h1>
+  <div class="subtitle">A car hits a barrier, the airbag deploys, the dummy pitches forward and rebounds. The whole event takes 50 milliseconds. At 60 fps you see a smear. Pull the lever up and watch every stage resolve frame by frame, which is how safety engineers measure what happens.</div>
+
+  <!-- STAGE -->
+  <div class="stage">
+    <canvas id="sceneCanvas"></canvas>
+    <div class="stage-controls">
+      <button class="btn-play" id="btnPlay">Pause</button>
+    </div>
+  </div>
+
+  <!-- LEVER PANEL -->
+  <div class="lever-panel">
+    <div class="lever-panel-label">Frame-Rate Lever</div>
+    <canvas id="leverCanvas"></canvas>
+  </div>
+
+  <!-- STATS STRIP -->
+  <div class="stats-strip">
+    <div class="stat">
+      <div class="stat-label">Capture</div>
+      <div class="stat-value" id="statCapture">5,000 fps</div>
+    </div>
+    <div class="stat stat-hero">
+      <div class="stat-label">Slow-Motion Factor</div>
+      <div class="stat-value" id="statFactor">166×</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">50 ms stretches to</div>
+      <div class="stat-value" id="statStretch">0.83 s</div>
+    </div>
+  </div>
+
+  <!-- PRESETS -->
+  <div class="preset-grid-label">Frame Rates</div>
+  <div class="preset-grid" id="presetGrid">
+    <button class="preset" data-fps="60"><span class="preset-fps">60<span class="unit">fps</span></span><span class="preset-ctx">phone camera</span></button>
+    <button class="preset" data-fps="240"><span class="preset-fps">240<span class="unit">fps</span></span><span class="preset-ctx">action cam</span></button>
+    <button class="preset" data-fps="1000"><span class="preset-fps">1,000<span class="unit">fps</span></span><span class="preset-ctx">broadcast</span></button>
+    <button class="preset" data-fps="2500"><span class="preset-fps">2,500<span class="unit">fps</span></span><span class="preset-ctx">industrial</span></button>
+    <button class="preset active" data-fps="5000"><span class="preset-fps">5,000<span class="unit">fps</span></span><span class="preset-ctx">science lab</span></button>
+    <button class="preset" data-fps="10000"><span class="preset-fps">10,000<span class="unit">fps</span></span><span class="preset-ctx">ballistics</span></button>
+    <button class="preset" data-fps="15000"><span class="preset-fps">15,000<span class="unit">fps</span></span><span class="preset-ctx">impact research</span></button>
+    <button class="preset" data-fps="20000"><span class="preset-fps">20,000<span class="unit">fps</span></span><span class="preset-ctx">the ceiling</span></button>
+  </div>
+
+  <div class="note">
+    <p>Crash tests are not filmed for drama. They are filmed for <strong>measurement</strong>. The airbag must fully deploy in ~40 ms, before the dummy's head reaches its path. Engineers need to track the head's trajectory to within a millimeter to compute the Head Injury Criterion that certifies a vehicle. A 60 fps camera samples that trajectory every 16 ms, which is blind to most of the event. At 5,000 fps the airbag inflation resolves into discrete stages. At 20,000 fps a crash lab can measure dummy kinematics to fractions of a millimeter. Same 50 ms event. More samples, more truth.</p>
+  </div>
+
+  <div class="specs-strip">
+    <div class="spec-item"><span class="spec-label">Series</span><span class="spec-value">ITD-021</span></div>
+    <div class="spec-item"><span class="spec-label">Topic</span><span class="spec-value">Crash Test Kinematics</span></div>
+    <div class="spec-item"><span class="spec-label">Interaction</span><span class="spec-value">Physical Lever</span></div>
+    <div class="spec-item"><span class="spec-label">Author</span><span class="spec-value">ciamac.com</span></div>
+  </div>
+
+  <div class="itd-footer">
+    <span>ITD-021 / Interactive Technical Diagram</span>
+    <a href="https://ciamac.com">ciamac.com</a>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── CONSTANTS ──
+  const PHYSICAL_DURATION = 0.050;  // 50 ms crash event (impact → airbag → rebound)
+  const PLAYBACK_FPS = 30;
+  const FPS_MIN = 60;
+  const FPS_MAX = 20000;
+  const PAUSE_BETWEEN_LOOPS = 1.8;  // pause long enough to read the intact pre-impact frame
+
+  const LOG_RANGE = Math.log(FPS_MAX / FPS_MIN);
+  const LEVER_MIN_ANG = -55 * Math.PI / 180;
+  const LEVER_MAX_ANG =  55 * Math.PI / 180;
+
+  function fpsToAngle(fps) {
+    const u = Math.log(Math.max(FPS_MIN, Math.min(FPS_MAX, fps)) / FPS_MIN) / LOG_RANGE;
+    return LEVER_MIN_ANG + u * (LEVER_MAX_ANG - LEVER_MIN_ANG);
+  }
+  function angleToFps(angle) {
+    const u = (angle - LEVER_MIN_ANG) / (LEVER_MAX_ANG - LEVER_MIN_ANG);
+    return FPS_MIN * Math.exp(u * LOG_RANGE);
+  }
+
+  const TICK_FPS = [60, 240, 1000, 2500, 5000, 10000, 15000, 20000];
+
+  // ── STATE ──
+  let currentFps = 5000;
+  let playing = true;
+  let sceneAnimId = null;
+  let lastWall = 0;
+  let wallElapsed = 0;
+  let inPauseGap = false;
+  let pauseGapT = 0;
+  let dragging = false;
+
+  // ── SCENE CANVAS (bullet-through-apple) ──
+  const canvas = document.getElementById('sceneCanvas');
+  const ctx = canvas.getContext('2d');
+  let cssW = 0, cssH = 0;
+
+  function resizeScene() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    cssW = rect.width; cssH = rect.height;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  const SCN_W = 640, SCN_H = 420;
+  const GROUND_Y = 330;                       // top of ground in scene-space
+  const WALL_X   = 540;                       // barrier x (right side)
+  const CAR_LEN_INITIAL = 200;                // car length before crush
+  const CAR_HEIGHT = 88;
+  const CAR_Y_TOP = GROUND_Y - CAR_HEIGHT;    // top of car body
+  const WHEEL_R = 20;
+  const MAX_CRUSH = 58;                       // max front-end compression
+  const CAR_START_FRONT = 300;                // front bumper x at t=0
+  const IMPACT_T   = 0.08;
+  const CRUSH_END_T = 0.22;                   // crush propagation finishes
+  const AIRBAG_START_T = 0.18;                // sensor fire delay
+  const AIRBAG_FULL_T  = 0.38;
+  const AIRBAG_HOLD_END_T = 0.82;             // start deflate
+  const DUMMY_PITCH_START_T = 0.08;
+  const DUMMY_HEAD_CONTACT_T = 0.52;
+  const DUMMY_REBOUND_END_T = 0.90;
+  const SCENE_END_FADE_START = 0.88;
+
+  function createRng(seed) {
+    let s = seed;
+    return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  }
+
+  // ── KINEMATIC HELPERS ──
+  function carFrontX(t) {
+    if (t < IMPACT_T) {
+      const u = t / IMPACT_T;
+      return CAR_START_FRONT + (WALL_X - CAR_START_FRONT) * u;
+    }
+    return WALL_X;
+  }
+  function carBackX(t) {
+    const front = carFrontX(t);
+    if (t < IMPACT_T) return front - CAR_LEN_INITIAL;
+    if (t < CRUSH_END_T) {
+      const u = (t - IMPACT_T) / (CRUSH_END_T - IMPACT_T);
+      // Ease-out crush — front collapses fast, then slows
+      const eased = 1 - Math.pow(1 - u, 2.2);
+      return front - CAR_LEN_INITIAL + eased * MAX_CRUSH;
+    }
+    return front - CAR_LEN_INITIAL + MAX_CRUSH;
+  }
+  function dummyPitch(t) {
+    if (t < DUMMY_PITCH_START_T) return 0;
+    if (t < DUMMY_HEAD_CONTACT_T) {
+      const u = (t - DUMMY_PITCH_START_T) / (DUMMY_HEAD_CONTACT_T - DUMMY_PITCH_START_T);
+      return u * 0.68;
+    }
+    if (t < 0.72) return 0.68;
+    if (t < DUMMY_REBOUND_END_T) {
+      const u = (t - 0.72) / (DUMMY_REBOUND_END_T - 0.72);
+      return 0.68 * (1 - u) + 0.03 * Math.sin(u * Math.PI * 2);  // small overshoot wobble
+    }
+    return 0;
+  }
+  function airbagRadius(t) {
+    const FULL_R = 48;
+    if (t < AIRBAG_START_T) return 0;
+    if (t < AIRBAG_FULL_T) {
+      const u = (t - AIRBAG_START_T) / (AIRBAG_FULL_T - AIRBAG_START_T);
+      return u * FULL_R;
+    }
+    if (t < AIRBAG_HOLD_END_T) return FULL_R;
+    const u = (t - AIRBAG_HOLD_END_T) / (1 - AIRBAG_HOLD_END_T);
+    return Math.max(0, FULL_R * (1 - u));
+  }
+
+  // Pre-generated debris pieces (small bumper/glass fragments at impact)
+  const NUM_DEBRIS = 28;
+  const debris = [];
+  {
+    const rng = createRng(41);
+    for (let i = 0; i < NUM_DEBRIS; i++) {
+      // Spawn point on the impact line just under the bumper
+      const spawnX = WALL_X - 4 - rng() * 6;
+      const spawnY = CAR_Y_TOP + 30 + rng() * 40;
+      // Velocity: fan outward back-left and up (chips spraying away from impact)
+      const ang = Math.PI - 0.35 - rng() * 0.9;    // between ~110° and ~180° (up-left cone)
+      const speed = 300 + rng() * 250;
+      const vx = Math.cos(ang) * speed;
+      const vy = Math.sin(ang) * speed - 140;      // extra lift
+      const size = 1.5 + rng() * 2;
+      const g = 900;
+      const dy = GROUND_Y - spawnY;
+      const disc = vy * vy + 2 * g * dy;
+      const landingTime = disc > 0 ? (-vy + Math.sqrt(disc)) / g : 99;
+      const releaseT = IMPACT_T + 0.005 + rng() * 0.03;
+      debris.push({ spawnX, spawnY, vx, vy, size, landingTime, releaseT, g,
+                    color: `rgba(${200 + Math.floor(rng()*40)}, ${180 + Math.floor(rng()*40)}, ${120 + Math.floor(rng()*60)}, 1)` });
+    }
+  }
+
+  function drawGroundAndWall(sceneEndFade) {
+    // Ground
+    const groundGrad = ctx.createLinearGradient(0, GROUND_Y, 0, SCN_H);
+    groundGrad.addColorStop(0, `rgba(30,30,36,${sceneEndFade})`);
+    groundGrad.addColorStop(1, `rgba(12,12,16,${sceneEndFade})`);
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, GROUND_Y, SCN_W, SCN_H - GROUND_Y);
+    // Ground top edge highlight
+    ctx.fillStyle = `rgba(255,217,77,${0.12 * sceneEndFade})`;
+    ctx.fillRect(0, GROUND_Y, SCN_W, 1);
+    // Ground tick marks (ruler-like, a crash-lab touch)
+    ctx.fillStyle = `rgba(255,217,77,${0.18 * sceneEndFade})`;
+    for (let x = 0; x < SCN_W; x += 40) {
+      ctx.fillRect(x, GROUND_Y + 2, 1, 4);
+    }
+
+    // Wall (concrete barrier)
+    const wallW = SCN_W - WALL_X;
+    const wallGrad = ctx.createLinearGradient(WALL_X, 0, SCN_W, 0);
+    wallGrad.addColorStop(0, `rgba(60,60,68,${sceneEndFade})`);
+    wallGrad.addColorStop(1, `rgba(30,30,36,${sceneEndFade})`);
+    ctx.fillStyle = wallGrad;
+    ctx.fillRect(WALL_X, 40, wallW, GROUND_Y - 40);
+    // Diagonal safety stripes on wall
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(WALL_X, 40, wallW, GROUND_Y - 40);
+    ctx.clip();
+    ctx.strokeStyle = `rgba(255,217,77,${0.22 * sceneEndFade})`;
+    ctx.lineWidth = 5;
+    for (let yy = -wallW; yy < GROUND_Y + wallW; yy += 22) {
+      ctx.beginPath();
+      ctx.moveTo(WALL_X, yy);
+      ctx.lineTo(WALL_X + wallW + 20, yy + wallW + 20);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // Wall front edge
+    ctx.strokeStyle = `rgba(255,255,255,${0.1 * sceneEndFade})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(WALL_X + 0.5, 40);
+    ctx.lineTo(WALL_X + 0.5, GROUND_Y);
+    ctx.stroke();
+  }
+
+  function drawCar(t, sceneEndFade, fps) {
+    const fx = carFrontX(t);
+    const bx = carBackX(t);
+    const carLen = fx - bx;
+    const bodyTop = CAR_Y_TOP;
+    const bodyBot = GROUND_Y - 6;
+
+    // Motion-blur streak on approach at low fps
+    if (t < IMPACT_T) {
+      const speed = (WALL_X - CAR_START_FRONT) / IMPACT_T;
+      const exposureScene = Math.min(0.3, 1 / (fps * PHYSICAL_DURATION));
+      const streakLen = speed * exposureScene;
+      if (streakLen > 2) {
+        const tailX = bx - streakLen;
+        const grad = ctx.createLinearGradient(tailX, 0, bx, 0);
+        grad.addColorStop(0, `rgba(255,217,77,0)`);
+        grad.addColorStop(1, `rgba(255,217,77,${0.25 * sceneEndFade})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(tailX, CAR_Y_TOP + 20, bx - tailX, CAR_HEIGHT - 30);
+      }
+    }
+
+    // Car shadow on ground (tracks with car)
+    const shadowGrad = ctx.createRadialGradient((bx + fx) / 2, GROUND_Y + 4, 8, (bx + fx) / 2, GROUND_Y + 4, carLen * 0.6);
+    shadowGrad.addColorStop(0, `rgba(0,0,0,${0.55 * sceneEndFade})`);
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = shadowGrad;
+    ctx.fillRect(bx - 20, GROUND_Y, carLen + 40, 22);
+
+    // Build crushed-front polygon so the front end shortens visibly as the car crushes
+    // Outline: back (vertical), bottom (under body to front), front (vertical, possibly shorter), top (sloped windshield + roof)
+    const roofStartX = bx + carLen * 0.28;
+    const roofEndX   = bx + carLen * 0.70;
+    const roofY      = bodyTop - 28;
+    const windshieldBaseX = roofStartX - 8;
+
+    // Crush deformation: reduce front height slightly as damage progresses
+    const crushProgress = t < IMPACT_T ? 0 :
+                          t < CRUSH_END_T ? (t - IMPACT_T) / (CRUSH_END_T - IMPACT_T) :
+                          1;
+    const frontCrumple = crushProgress * 10;  // the front sags by this much at max
+    const hoodDip = crushProgress * 6;         // hood deforms
+
+    ctx.beginPath();
+    ctx.moveTo(bx, bodyBot);                               // rear-bottom
+    ctx.lineTo(fx, bodyBot);                                // front-bottom
+    ctx.lineTo(fx, bodyTop + 18 + frontCrumple);            // front vertical (shorter when crushed)
+    // Crushed hood line from front up to windshield base
+    ctx.lineTo(roofEndX + 6, bodyTop + hoodDip);
+    ctx.lineTo(roofEndX, roofY);                            // up windshield right
+    ctx.lineTo(roofStartX, roofY);                          // roof
+    ctx.lineTo(windshieldBaseX, bodyTop);                   // down rear windshield
+    ctx.lineTo(bx + 4, bodyTop);                            // back-top
+    ctx.lineTo(bx, bodyTop + 6);                            // rear chamfer
+    ctx.closePath();
+
+    // Body fill
+    const bodyGrad = ctx.createLinearGradient(0, bodyTop, 0, bodyBot);
+    bodyGrad.addColorStop(0, `rgba(255,230,140,${sceneEndFade})`);
+    bodyGrad.addColorStop(0.55, `rgba(255,217,77,${sceneEndFade})`);
+    bodyGrad.addColorStop(1, `rgba(180,130,30,${sceneEndFade})`);
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(40,30,10,${0.75 * sceneEndFade})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Windshield glass
+    ctx.beginPath();
+    ctx.moveTo(windshieldBaseX + 2, bodyTop - 1);
+    ctx.lineTo(roofStartX + 1, roofY + 2);
+    ctx.lineTo(roofEndX - 1, roofY + 2);
+    ctx.lineTo(roofEndX + 4, bodyTop - 1 + hoodDip);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(80,110,140,${0.55 * sceneEndFade})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(200,220,255,${0.3 * sceneEndFade})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Side window
+    const sideWinX = bx + 12;
+    const sideWinY = bodyTop + 4;
+    ctx.fillStyle = `rgba(60,80,100,${0.65 * sceneEndFade})`;
+    ctx.fillRect(sideWinX, sideWinY, windshieldBaseX - sideWinX - 4, 16);
+
+    // Door line
+    ctx.strokeStyle = `rgba(0,0,0,${0.35 * sceneEndFade})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const doorX = bx + carLen * 0.45;
+    ctx.moveTo(doorX, bodyTop + 6);
+    ctx.lineTo(doorX, bodyBot - 2);
+    ctx.stroke();
+
+    // Headlight at front
+    ctx.beginPath();
+    ctx.ellipse(fx - 6, bodyTop + 28 + frontCrumple / 2, 4, 3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,241,165,${0.85 * sceneEndFade})`;
+    ctx.fill();
+
+    // Crumple wrinkles on the front end after impact
+    if (t > IMPACT_T) {
+      ctx.strokeStyle = `rgba(60,40,10,${0.65 * sceneEndFade})`;
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const wx = fx - 4 - i * 6;
+        const wtop = bodyTop + 18 + frontCrumple + i * 2;
+        const wbot = bodyBot - 6 - i * 2;
+        ctx.beginPath();
+        ctx.moveTo(wx, wtop);
+        ctx.lineTo(wx + 2, wbot);
+        ctx.stroke();
+      }
+    }
+
+    // Wheels
+    const wheelY = GROUND_Y - WHEEL_R + 2;
+    const rearWheelX = bx + 28;
+    const frontWheelX = fx - 28;
+    for (const [wx, wy] of [[rearWheelX, wheelY], [frontWheelX, wheelY]]) {
+      // Tire
+      ctx.beginPath();
+      ctx.arc(wx, wy, WHEEL_R, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(22,22,26,${sceneEndFade})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(0,0,0,${sceneEndFade})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      // Hub
+      ctx.beginPath();
+      ctx.arc(wx, wy, WHEEL_R * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(120,120,130,${sceneEndFade})`;
+      ctx.fill();
+      // Center
+      ctx.beginPath();
+      ctx.arc(wx, wy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(60,60,70,${sceneEndFade})`;
+      ctx.fill();
+    }
+  }
+
+  function drawAirbag(t, sceneEndFade) {
+    const r = airbagRadius(t);
+    if (r < 1) return;
+
+    // Position: steering wheel area, inside car interior (forward of dummy)
+    const bx = carBackX(t);
+    const fx = carFrontX(t);
+    const carLen = fx - bx;
+    const cx_ab = bx + carLen * 0.66;
+    const cy_ab = CAR_Y_TOP + 40;
+
+    // Airbag body
+    const bagGrad = ctx.createRadialGradient(cx_ab - 6, cy_ab - 6, 2, cx_ab, cy_ab, r);
+    bagGrad.addColorStop(0, `rgba(255,255,255,${0.95 * sceneEndFade})`);
+    bagGrad.addColorStop(0.7, `rgba(230,240,255,${0.88 * sceneEndFade})`);
+    bagGrad.addColorStop(1, `rgba(180,200,220,${0.7 * sceneEndFade})`);
+    ctx.fillStyle = bagGrad;
+    ctx.beginPath();
+    ctx.arc(cx_ab, cy_ab, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(80,100,120,${0.45 * sceneEndFade})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Seam/center panel line
+    if (r > 10) {
+      ctx.strokeStyle = `rgba(120,140,160,${0.35 * sceneEndFade})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(cx_ab, cy_ab - r);
+      ctx.lineTo(cx_ab, cy_ab + r);
+      ctx.stroke();
+    }
+  }
+
+  function drawDummy(t, sceneEndFade) {
+    const bx = carBackX(t);
+    const fx = carFrontX(t);
+    const carLen = fx - bx;
+    // Hip (seat belt pivot)
+    const hipX = bx + carLen * 0.40;
+    const hipY = GROUND_Y - 30;
+    const pitch = dummyPitch(t);
+    const torsoLen = 42;
+    const headR = 10;
+
+    // Legs (stay roughly in place, bent at knee toward dashboard)
+    ctx.strokeStyle = `rgba(240,240,246,${0.95 * sceneEndFade})`;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(hipX, hipY);
+    ctx.lineTo(hipX + 22, hipY - 4);       // thigh
+    ctx.lineTo(hipX + 38, hipY + 20);       // shin
+    ctx.stroke();
+
+    // Torso (pitches forward from hip)
+    const torsoEndX = hipX + Math.sin(pitch) * torsoLen;
+    const torsoEndY = hipY - Math.cos(pitch) * torsoLen;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(hipX, hipY);
+    ctx.lineTo(torsoEndX, torsoEndY);
+    ctx.stroke();
+
+    // Arm (bent forward, moves with torso)
+    const armAng = pitch + 0.25;
+    const elbowX = hipX + Math.sin(armAng) * 22;
+    const elbowY = hipY - Math.cos(armAng) * 22;
+    const handX = elbowX + Math.sin(armAng + 0.6) * 18;
+    const handY = elbowY - Math.cos(armAng + 0.6) * 18 + 10;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(hipX + Math.sin(pitch) * 18, hipY - Math.cos(pitch) * 18);
+    ctx.lineTo(elbowX, elbowY);
+    ctx.lineTo(handX, handY);
+    ctx.stroke();
+
+    // Head
+    const headX = hipX + Math.sin(pitch) * (torsoLen + headR);
+    const headY = hipY - Math.cos(pitch) * (torsoLen + headR);
+    ctx.beginPath();
+    ctx.arc(headX, headY, headR, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(250,250,255,${0.98 * sceneEndFade})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(30,30,40,${0.7 * sceneEndFade})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Head marker dot (crash-test tracking marker)
+    ctx.beginPath();
+    ctx.arc(headX, headY, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,217,77,${sceneEndFade})`;
+    ctx.fill();
+
+    // Head trajectory trace after impact (shows the arc HS cameras measure)
+    if (t > IMPACT_T) {
+      ctx.strokeStyle = `rgba(255,217,77,${0.35 * sceneEndFade})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      let first = true;
+      for (let sampleT = IMPACT_T; sampleT <= t; sampleT += 0.01) {
+        const sBx = carBackX(sampleT);
+        const sFx = carFrontX(sampleT);
+        const sCarLen = sFx - sBx;
+        const sHipX = sBx + sCarLen * 0.40;
+        const sHipY = GROUND_Y - 30;
+        const sPitch = dummyPitch(sampleT);
+        const sHeadX = sHipX + Math.sin(sPitch) * (torsoLen + headR);
+        const sHeadY = sHipY - Math.cos(sPitch) * (torsoLen + headR);
+        if (first) { ctx.moveTo(sHeadX, sHeadY); first = false; }
+        else ctx.lineTo(sHeadX, sHeadY);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  function drawDebris(t, sceneEndFade) {
+    for (const p of debris) {
+      if (t < p.releaseT) continue;
+      const dt = t - p.releaseT;
+      let x, y, alpha;
+      if (dt >= p.landingTime) {
+        x = p.spawnX + p.vx * p.landingTime;
+        y = GROUND_Y;
+        const settle = dt - p.landingTime;
+        alpha = Math.max(0, 1 - settle * 1.8);
+      } else {
+        x = p.spawnX + p.vx * dt;
+        y = p.spawnY + p.vy * dt + 0.5 * p.g * dt * dt;
+        alpha = Math.max(0, 1 - dt * 0.6);
+      }
+      alpha *= sceneEndFade;
+      if (alpha <= 0.02) continue;
+      ctx.fillStyle = p.color.replace(', 1)', `, ${alpha})`);
+      ctx.fillRect(x, y, p.size, p.size);
+    }
+  }
+
+  function drawImpactBurst(t, sceneEndFade) {
+    if (t < IMPACT_T || t > IMPACT_T + 0.09) return;
+    const age = (t - IMPACT_T) / 0.09;
+    const a = (1 - age) * sceneEndFade;
+    if (a <= 0) return;
+    const bx = WALL_X;
+    const by = CAR_Y_TOP + CAR_HEIGHT / 2 + 6;
+    const r = 12 + 36 * age;
+    const grad = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+    grad.addColorStop(0, `rgba(255,255,220,${0.75 * a})`);
+    grad.addColorStop(0.5, `rgba(255,217,77,${0.35 * a})`);
+    grad.addColorStop(1, `rgba(255,217,77,0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx - r, by - r, r * 2, r * 2);
+
+    // Radial spokes outward-left (debris direction)
+    for (let i = 0; i < 8; i++) {
+      const ang = Math.PI - 0.4 - (i / 7) * 1.0;
+      const len = 10 + 48 * age;
+      ctx.strokeStyle = `rgba(255,241,165,${0.6 * a})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + Math.cos(ang) * len, by + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+  }
+
+  function drawPhaseLabel(t, sceneEndFade) {
+    const ms = (t * PHYSICAL_DURATION * 1000).toFixed(1);
+    let phase;
+    if (t < IMPACT_T) phase = 'pre-impact approach';
+    else if (t < CRUSH_END_T) phase = 'crush · bumper collapse';
+    else if (t < AIRBAG_FULL_T) phase = 'airbag deploying';
+    else if (t < DUMMY_HEAD_CONTACT_T) phase = 'dummy pitching forward';
+    else if (t < 0.72) phase = 'head contact · absorbing';
+    else if (t < DUMMY_REBOUND_END_T) phase = 'rebound';
+    else phase = 'settle';
+
+    ctx.font = `500 11px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = `rgba(200,200,208,${0.55 * sceneEndFade})`;
+    ctx.fillText(`event clock: ${ms} ms`, 14, 20);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = `rgba(255,217,77,${0.85 * sceneEndFade})`;
+    ctx.font = `600 12px "JetBrains Mono", monospace`;
+    ctx.fillText(phase, SCN_W - 14, 20);
+  }
+
+  function drawScene(t) {
+    ctx.clearRect(0, 0, cssW, cssH);
+    const bg = ctx.createLinearGradient(0, 0, 0, cssH);
+    bg.addColorStop(0, '#0d0d12');
+    bg.addColorStop(1, '#060608');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    const scale = Math.min(cssW / SCN_W, cssH / SCN_H);
+    const ox = (cssW - SCN_W * scale) / 2;
+    const oy = (cssH - SCN_H * scale) / 2;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.scale(scale, scale);
+
+    let sceneEndFade = 1;
+    if (t > SCENE_END_FADE_START) {
+      sceneEndFade = Math.max(0, 1 - (t - SCENE_END_FADE_START) / (1 - SCENE_END_FADE_START));
+    }
+
+    drawGroundAndWall(sceneEndFade);
+    drawCar(t, sceneEndFade, currentFps);
+    drawAirbag(t, sceneEndFade);
+    drawDummy(t, sceneEndFade);
+    drawImpactBurst(t, sceneEndFade);
+    drawDebris(t, sceneEndFade);
+    drawPhaseLabel(t, sceneEndFade);
+
+    ctx.restore();
+  }
+
+  // ── LEVER CANVAS ──
+  const leverCanvas = document.getElementById('leverCanvas');
+  const lctx = leverCanvas.getContext('2d');
+  let lW = 0, lH = 0;
+
+  function resizeLever() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = leverCanvas.getBoundingClientRect();
+    lW = rect.width; lH = rect.height;
+    leverCanvas.width = Math.round(lW * dpr);
+    leverCanvas.height = Math.round(lH * dpr);
+    lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function leverGeometry() {
+    const cx = lW / 2;
+    const cy = lH - 36;
+    const L = Math.min(lH - 86, lW * 0.32);
+    const arcR = L + 22;
+    return { cx, cy, L, arcR };
+  }
+
+  function fmtFpsShort(f) {
+    const r = Math.round(f);
+    if (r >= 1000) return (r / 1000).toFixed(r >= 10000 ? 0 : 1).replace('.0','') + 'k';
+    return r.toString();
+  }
+
+  function drawLever() {
+    lctx.clearRect(0, 0, lW, lH);
+
+    // Panel background
+    const bg = lctx.createLinearGradient(0, 0, 0, lH);
+    bg.addColorStop(0, '#0f0f13');
+    bg.addColorStop(1, '#09090c');
+    lctx.fillStyle = bg;
+    lctx.fillRect(0, 0, lW, lH);
+
+    const { cx, cy, L, arcR } = leverGeometry();
+
+    // Metal base plate at the bottom
+    const plateW = Math.min(lW - 60, 420);
+    const plateX = cx - plateW / 2;
+    const plateY = lH - 54;
+    const plateH = 36;
+    // Shadow
+    lctx.fillStyle = 'rgba(0,0,0,0.45)';
+    lctx.fillRect(plateX + 3, plateY + plateH - 2, plateW - 6, 10);
+    // Plate body
+    const plateGrad = lctx.createLinearGradient(0, plateY, 0, plateY + plateH);
+    plateGrad.addColorStop(0, '#2e2e36');
+    plateGrad.addColorStop(0.5, '#202026');
+    plateGrad.addColorStop(1, '#141418');
+    lctx.fillStyle = plateGrad;
+    lctx.fillRect(plateX, plateY, plateW, plateH);
+    // Top highlight strip
+    lctx.fillStyle = 'rgba(255,255,255,0.06)';
+    lctx.fillRect(plateX, plateY, plateW, 1);
+    lctx.fillStyle = 'rgba(0,0,0,0.4)';
+    lctx.fillRect(plateX, plateY + plateH - 1, plateW, 1);
+    // Rivets
+    lctx.fillStyle = '#404048';
+    for (const px of [plateX + 14, plateX + plateW - 14]) {
+      lctx.beginPath();
+      lctx.arc(px, plateY + plateH / 2, 3, 0, Math.PI * 2);
+      lctx.fill();
+      lctx.beginPath();
+      lctx.arc(px - 1, plateY + plateH / 2 - 1, 1, 0, Math.PI * 2);
+      lctx.fillStyle = 'rgba(255,255,255,0.15)';
+      lctx.fill();
+      lctx.fillStyle = '#404048';
+    }
+
+    // Arc groove (the track the knob sweeps)
+    lctx.beginPath();
+    const startAng = -Math.PI / 2 + LEVER_MIN_ANG;
+    const endAng   = -Math.PI / 2 + LEVER_MAX_ANG;
+    lctx.arc(cx, cy, arcR, startAng, endAng);
+    lctx.strokeStyle = 'rgba(255,217,77,0.08)';
+    lctx.lineWidth = 18;
+    lctx.lineCap = 'butt';
+    lctx.stroke();
+
+    lctx.beginPath();
+    lctx.arc(cx, cy, arcR, startAng, endAng);
+    lctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    lctx.lineWidth = 1;
+    lctx.stroke();
+
+    // Tick marks + labels at preset positions
+    for (const fps of TICK_FPS) {
+      const ang = fpsToAngle(fps);
+      const isNear = Math.abs(currentFps - fps) / fps < 0.04;
+      const dir = Math.sin(ang);   // sign indicates tick side
+      const sinA = Math.sin(ang), cosA = Math.cos(ang);
+      // Rotate vector is (sin(ang), -cos(ang)) since angle is measured clockwise from UP
+      const vx = sinA, vy = -cosA;
+      const innerR = arcR - 10;
+      const outerR = arcR + 12;
+      const ix = cx + vx * innerR, iy = cy + vy * innerR;
+      const ox = cx + vx * outerR, oy = cy + vy * outerR;
+      lctx.strokeStyle = isNear ? 'rgba(255,217,77,0.95)' : 'rgba(255,217,77,0.35)';
+      lctx.lineWidth = isNear ? 2.2 : 1.4;
+      lctx.beginPath();
+      lctx.moveTo(ix, iy); lctx.lineTo(ox, oy);
+      lctx.stroke();
+
+      // Label further out
+      const labelR = arcR + 26;
+      const lx = cx + vx * labelR, ly = cy + vy * labelR;
+      lctx.font = `500 ${isNear ? 11 : 10}px "JetBrains Mono", monospace`;
+      lctx.fillStyle = isNear ? '#ffd94d' : 'rgba(160,160,170,0.6)';
+      lctx.textAlign = 'center';
+      lctx.textBaseline = 'middle';
+      lctx.fillText(fmtFpsShort(fps), lx, ly);
+    }
+
+    // Current angle
+    const angNow = fpsToAngle(currentFps);
+    const vx = Math.sin(angNow), vy = -Math.cos(angNow);
+
+    // Shaft (rotated rectangle)
+    lctx.save();
+    lctx.translate(cx, cy);
+    lctx.rotate(angNow);
+    // Shadow behind shaft
+    lctx.fillStyle = 'rgba(0,0,0,0.35)';
+    lctx.fillRect(-8, -L, 16, L);
+    // Metal shaft
+    const shaftGrad = lctx.createLinearGradient(-6, 0, 6, 0);
+    shaftGrad.addColorStop(0, '#2a2a32');
+    shaftGrad.addColorStop(0.5, '#8a8a95');
+    shaftGrad.addColorStop(1, '#2a2a32');
+    lctx.fillStyle = shaftGrad;
+    lctx.fillRect(-5, -L, 10, L);
+    // Edge outline
+    lctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    lctx.lineWidth = 1;
+    lctx.strokeRect(-5, -L, 10, L);
+    lctx.restore();
+
+    // Pivot cap
+    const pivotR = 14;
+    lctx.beginPath();
+    lctx.arc(cx, cy, pivotR + 2, 0, Math.PI * 2);
+    lctx.fillStyle = 'rgba(0,0,0,0.6)';
+    lctx.fill();
+    const pivotGrad = lctx.createRadialGradient(cx - 4, cy - 4, 1, cx, cy, pivotR);
+    pivotGrad.addColorStop(0, '#555560');
+    pivotGrad.addColorStop(1, '#1a1a20');
+    lctx.fillStyle = pivotGrad;
+    lctx.beginPath();
+    lctx.arc(cx, cy, pivotR, 0, Math.PI * 2);
+    lctx.fill();
+    lctx.strokeStyle = '#0a0a0c';
+    lctx.lineWidth = 1;
+    lctx.stroke();
+    // Center bolt
+    lctx.beginPath();
+    lctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    lctx.fillStyle = '#ffd94d';
+    lctx.fill();
+
+    // Handle/knob at tip
+    const tipX = cx + vx * L;
+    const tipY = cy + vy * L;
+    const knobR = 24;
+    // Outer glow when dragging
+    if (dragging) {
+      const glow = lctx.createRadialGradient(tipX, tipY, knobR, tipX, tipY, knobR + 18);
+      glow.addColorStop(0, 'rgba(255,217,77,0.35)');
+      glow.addColorStop(1, 'rgba(255,217,77,0)');
+      lctx.fillStyle = glow;
+      lctx.beginPath();
+      lctx.arc(tipX, tipY, knobR + 18, 0, Math.PI * 2);
+      lctx.fill();
+    }
+    // Gold ring
+    lctx.beginPath();
+    lctx.arc(tipX, tipY, knobR, 0, Math.PI * 2);
+    const ringGrad = lctx.createRadialGradient(tipX - 8, tipY - 8, 2, tipX, tipY, knobR);
+    ringGrad.addColorStop(0, '#fff1a5');
+    ringGrad.addColorStop(0.5, '#ffd94d');
+    ringGrad.addColorStop(1, '#a07010');
+    lctx.fillStyle = ringGrad;
+    lctx.fill();
+    // Inner rubber
+    lctx.beginPath();
+    lctx.arc(tipX, tipY, knobR - 5, 0, Math.PI * 2);
+    const rubberGrad = lctx.createRadialGradient(tipX - 6, tipY - 6, 2, tipX, tipY, knobR - 5);
+    rubberGrad.addColorStop(0, '#42424c');
+    rubberGrad.addColorStop(1, '#15151a');
+    lctx.fillStyle = rubberGrad;
+    lctx.fill();
+    // Highlight dot
+    lctx.beginPath();
+    lctx.arc(tipX - 7, tipY - 7, 3.5, 0, Math.PI * 2);
+    lctx.fillStyle = 'rgba(255,255,255,0.5)';
+    lctx.fill();
+
+    // Current fps badge above knob
+    const badge = `${Math.round(currentFps).toLocaleString()} fps`;
+    lctx.font = `600 13px "JetBrains Mono", monospace`;
+    const metrics = lctx.measureText(badge);
+    const bw = metrics.width + 18;
+    const bh = 24;
+    const bx = tipX - bw / 2;
+    const by = tipY - knobR - bh - 8;
+    // Clamp badge inside panel
+    const bxClamped = Math.max(8, Math.min(lW - bw - 8, bx));
+    lctx.fillStyle = 'rgba(9,9,11,0.9)';
+    lctx.strokeStyle = 'rgba(255,217,77,0.55)';
+    lctx.lineWidth = 1;
+    lctx.beginPath();
+    if (lctx.roundRect) lctx.roundRect(bxClamped, by, bw, bh, 6);
+    else lctx.rect(bxClamped, by, bw, bh);
+    lctx.fill();
+    lctx.stroke();
+    lctx.fillStyle = '#ffd94d';
+    lctx.textAlign = 'center';
+    lctx.textBaseline = 'middle';
+    lctx.fillText(badge, bxClamped + bw / 2, by + bh / 2);
+  }
+
+  // ── MATH ──
+  function getMagnification()  { return currentFps / PLAYBACK_FPS; }
+  function getViewerDuration() { return PHYSICAL_DURATION * getMagnification(); }
+  function fmtMag(x) {
+    if (x >= 1000) return (x / 1000).toFixed(1) + 'k×';
+    if (x >= 10)   return Math.round(x) + '×';
+    return x.toFixed(1) + '×';
+  }
+  function fmtDur(s) {
+    if (s >= 1)     return s.toFixed(2) + ' s';
+    if (s >= 0.001) return (s * 1000).toFixed(1) + ' ms';
+    return (s * 1e6).toFixed(0) + ' μs';
+  }
+
+  function updateChrome() {
+    document.getElementById('statCapture').textContent = `${Math.round(currentFps).toLocaleString()} fps`;
+    document.getElementById('statFactor').textContent = fmtMag(getMagnification());
+    document.getElementById('statStretch').textContent = fmtDur(getViewerDuration());
+    document.querySelectorAll('.preset').forEach(p => {
+      const pf = parseInt(p.dataset.fps);
+      const ratio = currentFps / pf;
+      p.classList.toggle('active', ratio > 0.97 && ratio < 1.03);
+    });
+    drawLever();
+  }
+
+  // ── SCENE ANIMATION LOOP ──
+  function animateScene(time) {
+    if (!lastWall) lastWall = time;
+    const dt = Math.min((time - lastWall) / 1000, 0.1);
+    lastWall = time;
+
+    if (playing) {
+      if (inPauseGap) {
+        pauseGapT += dt;
+        if (pauseGapT >= PAUSE_BETWEEN_LOOPS) {
+          inPauseGap = false; pauseGapT = 0; wallElapsed = 0;
+        }
+      } else {
+        wallElapsed += dt;
+        const vd = getViewerDuration();
+        if (wallElapsed >= vd) {
+          wallElapsed = vd; inPauseGap = true; pauseGapT = 0;
+        }
+      }
+    }
+    let sceneT;
+    // During the pause gap, rest on the INTACT apple (t=0), not the exploded state (t=1)
+    if (inPauseGap) sceneT = 0.0;
+    else sceneT = getViewerDuration() > 0 ? (wallElapsed / getViewerDuration()) : 0;
+    sceneT = Math.max(0, Math.min(1, sceneT));
+    drawScene(sceneT);
+    sceneAnimId = requestAnimationFrame(animateScene);
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        if (!sceneAnimId) { lastWall = 0; sceneAnimId = requestAnimationFrame(animateScene); }
+      } else {
+        if (sceneAnimId) { cancelAnimationFrame(sceneAnimId); sceneAnimId = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── CONTROLS ──
+  function setFps(newFps) {
+    const vdOld = getViewerDuration();
+    const curSceneT = vdOld > 0 ? (wallElapsed / Math.max(0.0001, vdOld)) : 0;
+    currentFps = Math.max(FPS_MIN, Math.min(FPS_MAX, newFps));
+    updateChrome();
+    wallElapsed = Math.max(0, Math.min(getViewerDuration(), curSceneT * getViewerDuration()));
+  }
+
+  // Lever interaction
+  function leverAngleFromPoint(mx, my) {
+    const { cx, cy } = leverGeometry();
+    const dx = mx - cx;
+    const dy = cy - my; // up is positive
+    // atan2(dx, dy) → angle measured clockwise from UP
+    let angle = Math.atan2(dx, dy);
+    return Math.max(LEVER_MIN_ANG, Math.min(LEVER_MAX_ANG, angle));
+  }
+
+  function getLeverMouse(e) {
+    const rect = leverCanvas.getBoundingClientRect();
+    if (e.touches && e.touches[0]) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function onLeverDown(e) {
+    dragging = true;
+    leverCanvas.classList.add('grabbing');
+    const { x, y } = getLeverMouse(e);
+    const ang = leverAngleFromPoint(x, y);
+    setFps(angleToFps(ang));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onLeverMove(e) {
+    if (!dragging) return;
+    const { x, y } = getLeverMouse(e);
+    const ang = leverAngleFromPoint(x, y);
+    setFps(angleToFps(ang));
+    if (e.cancelable) e.preventDefault();
+  }
+  function onLeverUp() {
+    dragging = false;
+    leverCanvas.classList.remove('grabbing');
+    drawLever();
+  }
+  leverCanvas.addEventListener('mousedown', onLeverDown);
+  window.addEventListener('mousemove', onLeverMove);
+  window.addEventListener('mouseup', onLeverUp);
+  leverCanvas.addEventListener('touchstart', onLeverDown, { passive: false });
+  window.addEventListener('touchmove', onLeverMove, { passive: false });
+  window.addEventListener('touchend', onLeverUp);
+
+  // Presets snap the lever
+  document.querySelectorAll('.preset').forEach(btn => {
+    btn.addEventListener('click', () => setFps(parseInt(btn.dataset.fps)));
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    document.getElementById('btnPlay').textContent = playing ? 'Pause' : 'Play';
+  });
+
+  // ── INIT ──
+  function resizeAll() {
+    resizeScene();
+    resizeLever();
+    drawLever();
+  }
+  resizeAll();
+  updateChrome();
+  drawScene(0);
+  window.addEventListener('resize', resizeAll);
+})();
+</script>
+</body>
+</html>
