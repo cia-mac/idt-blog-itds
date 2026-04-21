@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inside the Ciamac Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0c0c0c;
+    color: #e0e0e0;
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+  h1 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.7em;
+    font-weight: 700;
+    color: #E8B600;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+  }
+  .subtitle {
+    font-size: 0.92em;
+    color: #777;
+    margin-bottom: 28px;
+  }
+  .subtitle span {
+    color: #E8B600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92em;
+  }
+
+  /* ── PANELS ── */
+  .panel {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 20px 0;
+  }
+  .panel-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #555;
+    margin-bottom: 16px;
+  }
+
+  /* ── PIPELINE CANVAS ── */
+  #pipelineCanvas {
+    width: 100%;
+    height: 260px;
+    display: block;
+    border-radius: 8px;
+    cursor: default;
+  }
+
+  /* ── INFO PANEL ── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 18px;
+  }
+  .info-card {
+    background: #141414;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    padding: 14px;
+    transition: border-color 0.4s, background 0.4s;
+  }
+  .info-card.active {
+    border-color: #E8B600;
+    background: rgba(232, 182, 0, 0.06);
+  }
+  .info-card-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.64em;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  .info-card.active .info-card-label { color: #E8B600; }
+  .info-card-value {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.86em;
+    color: #666;
+    min-height: 40px;
+    transition: color 0.3s;
+    line-height: 1.5;
+  }
+  .info-card.active .info-card-value { color: #d0d0d0; }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    border: none;
+    padding: 9px 22px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.78em;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s, background 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #E8B600; color: #0c0c0c; }
+  .btn-secondary { background: #1e1e1e; color: #888; }
+
+  .speed-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .speed-ctrl label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: #555;
+  }
+  .speed-ctrl input[type="range"] {
+    width: 90px;
+    -webkit-appearance: none;
+    height: 3px;
+    background: #2a2a2a;
+    border-radius: 2px;
+    outline: none;
+  }
+  .speed-ctrl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #E8B600;
+    cursor: pointer;
+    border: 2px solid #0c0c0c;
+  }
+  .speed-ctrl input[type="range"]::-moz-range-thumb {
+    background: #E8B600;
+    border: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72em;
+    color: #E8B600;
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* ── STATUS ── */
+  .status-log {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76em;
+    color: #555;
+    min-height: 22px;
+    margin-top: 14px;
+  }
+  .status-log .hl { color: #E8B600; }
+
+  /* ── KEY INSIGHT ── */
+  .note {
+    background: rgba(232, 182, 0, 0.04);
+    border-left: 2px solid #3a3010;
+    padding: 14px 18px;
+    margin: 18px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.88em;
+    color: #888;
+  }
+  .note strong { color: #E8B600; }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.66em;
+    color: #555;
+  }
+  .legend-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #1a1a1a;
+    color: #333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68em;
+    text-align: center;
+  }
+
+  @media (max-width: 680px) {
+    .container { padding: 20px 14px 32px; }
+    h1 { font-size: 1.4em; }
+    .info-grid { grid-template-columns: 1fr; }
+    #pipelineCanvas { height: 300px; }
+    .controls { gap: 8px; }
+    .speed-ctrl { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Inside the Ciamac Console</h1>
+  <p class="subtitle">How a content idea becomes a shipped deliverable. The <span>Console</span> pipeline, end to end.</p>
+
+  <div class="panel">
+    <div class="panel-label">Pipeline</div>
+    <canvas id="pipelineCanvas"></canvas>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Not yet reached</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#E8B600"></div> Current stage</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(232,182,0,0.3)"></div> Completed</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(232,182,0,0.6)"></div> Transition</div>
+    </div>
+
+    <!-- Info cards -->
+    <div class="info-grid">
+      <div class="info-card" id="infoAction">
+        <div class="info-card-label">What Happens</div>
+        <div class="info-card-value" id="valAction">--</div>
+      </div>
+      <div class="info-card" id="infoWho">
+        <div class="info-card-label">Who Sees It</div>
+        <div class="info-card-value" id="valWho">--</div>
+      </div>
+      <div class="info-card" id="infoData">
+        <div class="info-card-label">Where The Data Lives</div>
+        <div class="info-card-value" id="valData">--</div>
+      </div>
+    </div>
+
+    <div class="status-log" id="statusLog">Press play to walk the pipeline. Or click any stage.</div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="playBtn">PLAY</button>
+      <button class="btn btn-secondary" id="stepBtn">STEP</button>
+      <button class="btn btn-secondary" id="resetBtn">RESET</button>
+      <div class="speed-ctrl">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="1" max="5" value="2" step="1">
+        <span class="speed-val" id="speedVal">2x</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Key insight:</strong> The Console is a pipeline, not a task manager. Every card moves in one direction from Notion to Delivered. The only human gates are Sync, Schedule, and Review. Everything in between, timer rollups, status timestamps, Luiz visibility, is driven by database triggers and status transitions.
+  </div>
+
+  <footer>Ciamac Console / pipeline.ciamac.com</footer>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('pipelineCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: rect.width, h: rect.height };
+  }
+
+  let W, H;
+  function init() { const s = resize(); W = s.w; H = s.h; positions = computePositions(); }
+
+  // ── STAGE DEFINITIONS ──
+
+  const stages = [
+    {
+      id: 'notion',
+      label: 'NOTION',
+      short: 'Idea',
+      action: 'Idea captured in the IDT Content Queue database. Tagged with status, goal, and target outlet. Marked "Luiz Approved" when it is ready to enter the pipeline.',
+      who: 'Ciamac and Luiz, inside Notion. The Console does not see it yet.',
+      data: 'Notion database. Source of truth for ideas.',
+      color: '#888888'
+    },
+    {
+      id: 'pool',
+      label: 'POOL',
+      short: 'Synced',
+      action: 'Sync pulls every Luiz-Approved row from Notion into the Console pool. Each row becomes a ticket with its Notion page ID attached, so re-sync never duplicates.',
+      who: 'Ciamac, in the Console admin board. The card sits in the passive pool column.',
+      data: 'Supabase tickets table. status = pool, notion_page_id linked.',
+      color: '#4080D0'
+    },
+    {
+      id: 'scheduled',
+      label: 'SCHEDULED',
+      short: 'On calendar',
+      action: 'Ciamac drags the card onto a week column. target_week and target_day are set. The card now appears on the timeline for its publish week.',
+      who: 'Ciamac on the admin timeline. Luiz sees it on the read-only /luiz view for its week.',
+      data: 'Supabase tickets. status = scheduled, scheduled_at timestamp set.',
+      color: '#40B060'
+    },
+    {
+      id: 'in_progress',
+      label: 'IN PROGRESS',
+      short: 'Timer running',
+      action: 'Ciamac opens the card and hits Start Timer. The TimeTracker writes a time_entries row. A database trigger rolls the duration up into actual_hours live as the timer runs.',
+      who: 'Ciamac only. Luiz sees the card on his week view but does not see the timer.',
+      data: 'Supabase time_entries (new row) + tickets.actual_hours (trigger-updated).',
+      color: '#E8B600'
+    },
+    {
+      id: 'review',
+      label: 'REVIEW',
+      short: 'Luiz approves',
+      action: 'Draft is ready. Ciamac flips the card to review. Luiz gets a review prompt on his view and can approve or request revisions, with a note attached to the card.',
+      who: 'Luiz, through the review modal. Ciamac sees the approval in real time.',
+      data: 'Supabase tickets.status = review, then a ticket_reviews row logs the action.',
+      color: '#D94040'
+    },
+    {
+      id: 'delivered',
+      label: 'DELIVERED',
+      short: 'Shipped',
+      action: 'Card is approved and published. It moves to the Delivered list, counts toward billable hours, and leaves the active pipeline.',
+      who: 'Luiz sees it in the "Recently Delivered" strip. Ciamac sees it in the Billing view, grouped by week.',
+      data: 'Supabase tickets.status = delivered, delivered_at timestamp, feeds the billing rollup.',
+      color: '#9370DB'
+    }
+  ];
+
+  // Horizontal pipeline layout
+  function computePositions() {
+    const n = stages.length;
+    const margin = 48;
+    const usable = W - margin * 2;
+    const step = usable / (n - 1);
+    const cy = H / 2 - 8;
+    return stages.map((_, i) => ({
+      x: margin + i * step,
+      y: cy
+    }));
+  }
+
+  let positions = [];
+  const NODE_R = 30;
+
+  // ── STATE ──
+
+  let currentStage = -1;
+  let visitedStages = new Set();
+  let isPlaying = false;
+  let animTimer = null;
+  let transitionProgress = 0;
+  let transitioning = false;
+  let transitionFrom = -1;
+  let transitionRaf = null;
+  let isVisible = true;
+
+  // ── DOM REFS ──
+  const playBtn = document.getElementById('playBtn');
+  const stepBtn = document.getElementById('stepBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const speedSlider = document.getElementById('speedSlider');
+  const speedValEl = document.getElementById('speedVal');
+  const statusLog = document.getElementById('statusLog');
+  const infoCards = ['infoAction', 'infoWho', 'infoData'].map(id => document.getElementById(id));
+  const valAction = document.getElementById('valAction');
+  const valWho = document.getElementById('valWho');
+  const valData = document.getElementById('valData');
+
+  function getDelay() {
+    const speed = parseInt(speedSlider.value);
+    return [2800, 2000, 1400, 900, 550][speed - 1];
+  }
+
+  speedSlider.addEventListener('input', function() {
+    speedValEl.textContent = this.value + 'x';
+  });
+
+  // ── INTERSECTION OBSERVER ──
+  let animFrame = null;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        isVisible = true;
+        if (!animFrame) animFrame = requestAnimationFrame(() => { animFrame = null; draw(); });
+      } else {
+        isVisible = false;
+        if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; }
+      }
+    });
+  }, { threshold: 0.1 });
+  observer.observe(canvas);
+
+  // ── DRAWING ──
+
+  function drawArrow(fromX, fromY, toX, toY, lit, progress) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const ux = dx / dist;
+    const uy = dy / dist;
+
+    const sx = fromX + ux * (NODE_R + 4);
+    const sy = fromY + uy * (NODE_R + 4);
+    const ex = toX - ux * (NODE_R + 10);
+    const ey = toY - uy * (NODE_R + 10);
+
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.strokeStyle = lit ? 'rgba(232, 182, 0, 0.65)' : '#1e1e1e';
+    ctx.lineWidth = lit ? 2 : 1;
+    ctx.stroke();
+
+    // Arrowhead
+    const angle = Math.atan2(ey - sy, ex - sx);
+    const aLen = 9;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - aLen * Math.cos(angle - 0.35), ey - aLen * Math.sin(angle - 0.35));
+    ctx.lineTo(ex - aLen * Math.cos(angle + 0.35), ey - aLen * Math.sin(angle + 0.35));
+    ctx.closePath();
+    ctx.fillStyle = lit ? 'rgba(232, 182, 0, 0.65)' : '#1e1e1e';
+    ctx.fill();
+
+    // Animated pulse dot on lit arrow
+    if (lit && progress > 0 && progress < 1) {
+      const px = sx + (ex - sx) * progress;
+      const py = sy + (ey - sy) * progress;
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#E8B600';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(px, py, 10, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(232, 182, 0, 0.2)';
+      ctx.fill();
+    }
+  }
+
+  function drawNode(x, y, stage, index) {
+    const isCurrent = index === currentStage;
+    const isVisited = visitedStages.has(index);
+    const baseColor = stage.color;
+
+    // Glow
+    if (isCurrent) {
+      ctx.beginPath();
+      ctx.arc(x, y, NODE_R + 14, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(x, y, NODE_R, x, y, NODE_R + 18);
+      grad.addColorStop(0, baseColor + '35');
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fill();
+    }
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(x, y, NODE_R, 0, Math.PI * 2);
+    if (isCurrent) {
+      ctx.fillStyle = baseColor + '25';
+      ctx.fill();
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 2.5;
+    } else if (isVisited) {
+      ctx.fillStyle = baseColor + '10';
+      ctx.fill();
+      ctx.strokeStyle = baseColor + '50';
+      ctx.lineWidth = 1.5;
+    } else {
+      ctx.fillStyle = '#141414';
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+    }
+    ctx.stroke();
+
+    // Stage number
+    ctx.font = `600 12px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = isCurrent ? baseColor : (isVisited ? baseColor + '90' : '#444');
+    ctx.fillText(String(index + 1), x, y - 4);
+
+    // Short label inside node
+    ctx.font = `500 7.5px "JetBrains Mono", monospace`;
+    ctx.fillStyle = isCurrent ? '#e0e0e0' : (isVisited ? '#888' : '#444');
+    ctx.fillText(stage.label, x, y + 10);
+
+    // Caption below the node
+    ctx.font = `500 9.5px "JetBrains Mono", monospace`;
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = isCurrent ? '#aaa' : '#444';
+    ctx.fillText(stage.short, x, y + NODE_R + 12);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Section labels above the pipeline
+    ctx.font = `500 9px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#333';
+    ctx.fillText('SOURCE', positions[0].x - NODE_R, 18);
+    ctx.fillText('CONSOLE', positions[1].x - NODE_R, 18);
+    ctx.fillText('DELIVERY', positions[5].x - NODE_R, 18);
+
+    // Divider between Source (Notion) and Console
+    const divX = (positions[0].x + positions[1].x) / 2;
+    ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(divX, 34);
+    ctx.lineTo(divX, H - 40);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Arrows
+    for (let i = 0; i < stages.length - 1; i++) {
+      const isTransitionArrow = transitioning && transitionFrom === i && currentStage === i + 1;
+      const isVisitedArrow = visitedStages.has(i) && visitedStages.has(i + 1) && !isTransitionArrow;
+      drawArrow(
+        positions[i].x, positions[i].y,
+        positions[i + 1].x, positions[i + 1].y,
+        isTransitionArrow || isVisitedArrow,
+        isTransitionArrow ? transitionProgress : 0
+      );
+    }
+
+    // Nodes
+    for (let i = 0; i < stages.length; i++) {
+      drawNode(positions[i].x, positions[i].y, stages[i], i);
+    }
+
+    // Footer row under the pipeline: where each stage lives
+    ctx.font = `500 8px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#2e2e2e';
+    const footerY = H - 22;
+    ctx.fillText('notion.so', positions[0].x, footerY);
+    for (let i = 1; i < stages.length; i++) {
+      ctx.fillText('supabase.tickets', positions[i].x, footerY);
+    }
+  }
+
+  // ── STATE TRANSITIONS ──
+
+  function updateInfo(idx) {
+    if (idx < 0) {
+      valAction.textContent = '--';
+      valWho.textContent = '--';
+      valData.textContent = '--';
+      infoCards.forEach(c => c.classList.remove('active'));
+      return;
+    }
+    const s = stages[idx];
+    valAction.textContent = s.action;
+    valWho.textContent = s.who;
+    valData.textContent = s.data;
+    infoCards.forEach(c => c.classList.add('active'));
+  }
+
+  function goToStage(idx, animate) {
+    const prev = currentStage;
+    transitionFrom = prev;
+    currentStage = idx;
+    visitedStages.add(idx);
+
+    updateInfo(idx);
+    statusLog.innerHTML = 'Stage ' + (idx + 1) + ' of ' + stages.length + ': <span class="hl">' + stages[idx].label + '</span>';
+
+    if (animate && prev >= 0 && prev === idx - 1) {
+      transitioning = true;
+      transitionProgress = 0;
+      const startTime = performance.now();
+      const duration = 450;
+
+      function animateTransition(now) {
+        if (!isVisible) {
+          transitionProgress = 1;
+          transitioning = false;
+          draw();
+          return;
+        }
+        transitionProgress = Math.min((now - startTime) / duration, 1);
+        draw();
+        if (transitionProgress < 1) {
+          transitionRaf = requestAnimationFrame(animateTransition);
+        } else {
+          transitioning = false;
+          draw();
+        }
+      }
+      cancelAnimationFrame(transitionRaf);
+      transitionRaf = requestAnimationFrame(animateTransition);
+    } else {
+      draw();
+    }
+  }
+
+  function stepForward() {
+    if (currentStage < 0) {
+      goToStage(0, false);
+    } else if (currentStage < stages.length - 1) {
+      goToStage(currentStage + 1, true);
+    } else {
+      // Loop back to start for continuous play
+      visitedStages.clear();
+      currentStage = -1;
+      updateInfo(-1);
+      draw();
+      setTimeout(() => goToStage(0, false), 300);
+    }
+  }
+
+  function resetMachine() {
+    clearTimeout(animTimer);
+    cancelAnimationFrame(transitionRaf);
+    isPlaying = false;
+    playBtn.textContent = 'PLAY';
+    currentStage = -1;
+    visitedStages.clear();
+    transitioning = false;
+    transitionProgress = 0;
+    updateInfo(-1);
+    statusLog.textContent = 'Press play to walk the pipeline. Or click any stage.';
+    draw();
+  }
+
+  function playLoop() {
+    if (!isPlaying) return;
+    stepForward();
+    animTimer = setTimeout(playLoop, getDelay());
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (isPlaying) {
+      isPlaying = false;
+      clearTimeout(animTimer);
+      playBtn.textContent = 'PLAY';
+    } else {
+      isPlaying = true;
+      playBtn.textContent = 'PAUSE';
+      if (currentStage < 0) goToStage(0, false);
+      animTimer = setTimeout(playLoop, getDelay());
+    }
+  });
+
+  stepBtn.addEventListener('click', () => {
+    if (isPlaying) {
+      isPlaying = false;
+      clearTimeout(animTimer);
+      playBtn.textContent = 'PLAY';
+    }
+    stepForward();
+  });
+
+  resetBtn.addEventListener('click', resetMachine);
+
+  // Click on a node to jump to it
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    for (let i = 0; i < positions.length; i++) {
+      const dx = cx - positions[i].x;
+      const dy = cy - positions[i].y;
+      if (dx * dx + dy * dy <= (NODE_R + 4) * (NODE_R + 4)) {
+        if (isPlaying) {
+          isPlaying = false;
+          clearTimeout(animTimer);
+          playBtn.textContent = 'PLAY';
+        }
+        // Mark all prior stages as visited so the path renders correctly
+        for (let k = 0; k <= i; k++) visitedStages.add(k);
+        goToStage(i, false);
+        return;
+      }
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    init();
+    draw();
+  });
+
+  init();
+  draw();
+})();
+</script>
+</body>
+</html>
