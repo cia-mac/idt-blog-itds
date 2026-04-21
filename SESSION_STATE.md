@@ -10,7 +10,7 @@ last_updated: 2026-04-19
 **Last Updated:** 2026-04-19 (post-autopilot)
 **Session:** ITD-020 shipped + abandoned concepts archived + ITD-021 crash-test prototyped (v1 → v3). ITD-008 v3/v4 moving-ball scene updated in parallel by another session.
 **Last committed:** `3494ba3` — "Gallery index_v13: add ITD-021 crash-test as New" (2026-04-19)
-**Branch:** main (no remote configured)
+**Branch:** main → `origin` at https://github.com/cia-mac/idt-blog-itds (public). GitHub Pages live at https://cia-mac.github.io/idt-blog-itds/ serving via root `index.html` meta-refresh to `index_v12.html`.
 
 ## Current State
 
@@ -72,7 +72,7 @@ Shipped, committed, featured in the live gallery. Pivoting arc lever, continuous
 
 ## Blockers
 
-- **No git remote configured.** Repo is local-only.
+- ~~No git remote~~ **Remote + Pages provisioned 2026-04-20.** `origin` = https://github.com/cia-mac/idt-blog-itds (public). Pages live at https://cia-mac.github.io/idt-blog-itds/. Root serves `index.html` which meta-refreshes to `index_v12.html` (the live gallery); bump that href when the gallery version advances. Repo is public to enable Pages on the free tier; switch to private only if a Pro/Team plan is active.
 - **IDT work on ice** per Luiz locked read (2026-04-14). `idt-specific/` bucket dormant. `generic/` is safe to keep developing.
 
 ## Fragile Areas
