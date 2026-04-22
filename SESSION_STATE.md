@@ -1,100 +1,112 @@
 ---
-workflow_step: itd_021_rejected_v12_remains_live_gallery
+workflow_step: remote_and_pages_live_gallery_v17
 agent_type: execute
 token_budget: deep
-last_updated: 2026-04-19
+last_updated: 2026-04-22
 ---
 
 # SESSION_STATE: idt-blog-itds
 
-**Last Updated:** 2026-04-19 (post-autopilot)
-**Session:** ITD-020 shipped + abandoned concepts archived + ITD-021 crash-test prototyped (v1 → v3). ITD-008 v3/v4 moving-ball scene updated in parallel by another session.
-**Last committed:** `3494ba3` — "Gallery index_v13: add ITD-021 crash-test as New" (2026-04-19)
-**Branch:** main → `origin` at https://github.com/cia-mac/idt-blog-itds (public). GitHub Pages live at https://cia-mac.github.io/idt-blog-itds/ serving via root `index.html` meta-refresh to `index_v12.html`.
+**Last Updated:** 2026-04-22 (exit ritual)
+**Session:** Multi-day autopilot + manual iteration. ITD-020 shipped, abandoned concepts archived, ITD-021 prototyped and rejected, ITD-008 / ITD-011 / ITD-014 iterated to v5/v6, gallery advanced index_v12 → v13 (prepared) → v14 → v15 → v16 → v17 (live), remote + Pages provisioned.
+**Last committed:** `a405d8a` — "ITD-014 v6: upgrade HDR scene from flat rectangles to gradient+glow render"
+**Branch:** main → `origin` at https://github.com/cia-mac/idt-blog-itds (public). GitHub Pages live at https://cia-mac.github.io/idt-blog-itds/ serving root `index.html` meta-refresh to `index_v17.html`.
 
 ## Current State
 
-Three new commits this session on top of the previous baseline `75d9d9b`:
+Working tree clean. Local and origin/main aligned at `a405d8a`. Repo has 12 commits ahead of the pre-session baseline `75d9d9b`.
 
-- `caa1b39` — Ship ITD-020 slow-motion lever with bullet-through-apple; v10 gallery (14 files)
-- `da8b192` — Archive abandoned ITD-017/018/019 concepts (7 files)
-- `e5289f2` — Prototype ITD-021 crash-test: temporal resolution lever (3 files)
-- `3494ba3` — Gallery index_v13: add ITD-021 crash-test as New (1 file, based on parallel-session v12)
+### Live gallery
 
-Parallel work on ITD-008 (v3 → v4 moving-ball scene) and the gallery (`index_v11.html` → `index_v12.html`) was done outside this Claude session and remains uncommitted.
+`index_v17.html` is current. `index.html` at the repo root is a meta-refresh redirect to v17 so the bare Pages URL serves the gallery. Every prior gallery version (v1 through v16) is preserved in repo root.
 
-### ITD-020: What Slow Motion Actually Is · `generic/itd-020-slow-motion_v8.html`
+### Shipped ITDs this session arc
 
-Shipped, committed, featured in the live gallery. Pivoting arc lever, continuous log-scale fps 60 to 20,000, bullet-through-apple scene, analytic particle landing, scene-end fade, intact-apple pause state. See prior SESSION_STATE_v5 for scene internals.
+| ITD | Current file | What shipped |
+|---|---|---|
+| ITD-020 | `generic/itd-020-slow-motion_v8.html` | Slow-motion lever + bullet-through-apple. First lever-pattern ITD; canonical template for the rest. |
+| ITD-008 | `generic/itd-008-bit-depth_v5.html` | Bit-depth demo with moving-ball scene, ground band, scene-aware histogram, unified light direction, gold retint. v3/v4 iterations also preserved. |
+| ITD-011 | `generic/itd-011-temporal-resolution_v5.html` | Fps cap bumped 15k → 20k to match ITD-020/021 ceiling. Preset context labels + copy alignment. |
+| ITD-014 | `generic/itd-014-hdr_v6.html` | HDR scene upgraded from flat rectangles to gradient + glow render. v5 fixed hidden olive-gold leak in histogram bars. |
 
-### ITD-021: The Camera Is A Ruler · `generic/itd-021-crash-test_v3.html` (prototype)
+### ITD-021: not in gallery
 
-- **Concept:** crash-test as measurement instrument. 120 ms side-view frontal crash, airbag fires at 15 ms, peak head excursion at ~87 ms. Lever controls **sampling rate**, not playback slowdown. Playback duration fixed at 3.2 s.
-- **Pedagogical distinction from ITD-020:** ITD-020 teaches "slow motion = capture/playback ratio." ITD-021 teaches "higher fps = finer temporal measurement." Same lever, different lesson.
-- **Scene:** concrete wall on left (with horizontal slab lines), car cross-section (hood → windshield → roof → rear window → rear deck → wheels), dashboard, steering wheel (narrow ellipse for side view), seat with headrest, dummy torso (seatbelt diagonal in gold webbing), muted-gray head, airbag inflating from wheel hub up-right toward driver with fabric seam overlay.
-- **Stats strip:** `Capture | Frames During Impact (hero, 7 → 2,400) | Between Samples (16.7 ms → 50 μs)`.
-- **Trajectory visualization:** dotted gold ghost of true curve + gold sample dots at `i/N` positions + solid gold reconstructed line through dots up to current sampledT. Dot size scales down with N for dense readability.
-- **Shutter flash:** gold-border vignette for 90 ms after each new captured frame OR after a lever change. At 60 fps reads as distinct "click, click" cadence. At 20 k reads as continuous glow.
-- **Head quantization:** `sampledT = Math.min(1, floor(trueT * N + 1e-6) / N)`. Head freezes on each sample for `PLAYBACK_DURATION / N` wall seconds. At 60 fps that's ~457 ms per freeze (visibly stutters). At 5 k it reads smooth.
-- **v1 → v3 iteration:**
-  - v1: first pass. Scene composition weak (detached airbag, invisible torso, head floating). Peak-excursion error stat was a dud (≤ 0.2 mm at 60 fps) because the chosen peak time 0.72 coincided with the 5/7 sample.
-  - v2: redrew scene as car cabin cross-section, added wall + wheels + windshield tint, recolored head to muted gray so gold reads as measurement overlay only, swapped stat to "Between Samples," added shutter-flash vignette.
-  - v3: lowered `HEAD_REST_Y` from 162 → 176 so head no longer clips roof (148), brightened torso fill `#2c2c34` → `#3a3a44` for legibility against cabin window tint.
-- **REJECTED after live review (2026-04-19).** The measurement-ruler framing did not land. Files (v1, v2, v3) remain in the repo and remain committed. `index_v13.html` was prepared to add ITD-021 to the Generic grid but was not promoted. **Live gallery is `index_v12.html`** (no ITD-021 card). A future session could either iterate to v4 with a different angle or leave the prototype as a reference.
+`generic/itd-021-crash-test_v1.html` was rebaselined by the owner to a new framing ("How Crash Tests Are Actually Measured", 50 ms crash, impact + airbag deploy + dummy kinematics). The three Claude prototypes (v1 pre-rebaseline, v2, v3 measurement-ruler angle) remain in the repo but are not linked from any gallery. An alternate v4 draft using ITD-020's playback-slowdown angle lives at `archive/abandoned-concepts/itd-021-crash-test_v4-draft-playback-angle.html`. `index_v13.html` was prepared to add ITD-021 to the Generic grid but was never promoted.
 
-### ITD-008 parallel work (outside this Claude session)
+### Archive structure
 
-`generic/itd-008-bit-depth_v3.html` (first ball pass), `generic/itd-008-bit-depth_v4.html` (bigger ball, ground band, default view, relocated label). Gallery at `index_v11.html` (superseded) and `index_v12.html` (live, featuring ITD-020 hero + ITD-008 v4 link). These files are untracked and not included in any commit from this autopilot.
+- `archive/abandoned-concepts/` — ITD-017/018/019 (rejected concepts) + ITD-021 v4 draft. README documents each.
+- `archive/prior-session-artifacts/` — stale untracked root files moved here on 2026-04-19: `SDI_HighSpeed_Cameras_Preview.pdf`, `SESSION_STATE_v4.md.bak`, `console-workflow_v1.html`. README documents each.
 
-### Abandoned concepts (archived)
+## Commit log (this session arc, on top of `75d9d9b`)
 
-`archive/abandoned-concepts/` contains ITD-017 v1/v2 (tradeoff sliders, rejected), ITD-018 v1/v2 (dual timeline, superseded by ITD-020), ITD-019 v1/v2 (filmstrip, rejected). README in that folder captures the reasoning.
+```
+a405d8a  ITD-014 v6: upgrade HDR scene from flat rectangles to gradient+glow render
+3e7a83a  SESSION_STATE: remote + Pages provisioned
+58232a3  Add root index.html redirecting to current live gallery
+e0ce8f3  ITD-014 v5: fix hidden olive-gold leak in histogram bars
+016a3b2  ITD-011 v5: fps cap 15k -> 20k, preset context labels, copy alignment
+7701a7b  Housekeeping: archive prior-session untracked artifacts
+52e923a  ITD-008 v5: gold retint fixes, scene-aware histogram, unified light direction
+19a939e  Housekeeping: ITD-008 moving-ball scene + gallery v11/v12 + ITD-021 rejection note
+1173d75  Update SESSION_STATE for index_v13 commit
+3494ba3  Gallery index_v13: add ITD-021 crash-test as New
+e5289f2  Prototype ITD-021 crash-test: temporal resolution lever
+da8b192  Archive abandoned ITD-017/018/019 concepts
+caa1b39  Ship ITD-020 slow-motion lever with bullet-through-apple; v10 gallery
+```
 
-## What Was Done This Autopilot
+## Key Decisions
 
-1. Committed ITD-020 shipped artifacts + v10 gallery (`caa1b39`)
-2. Moved abandoned ITD-017/018/019 files into `archive/abandoned-concepts/` with README, committed (`da8b192`)
-3. Built ITD-021 v1 prototype (single canvas crash-test with lever-controlled sampling)
-4. Audited v1 against the screenshot, identified: detached airbag, invisible torso, dud peak-error stat, gold-on-gold head
-5. Built ITD-021 v2 addressing all four audit points (redrawn scene, muted-gray head, "Between Samples" stat, shutter-flash)
-6. Tuned v2 → v3 (head below roof, torso brightness bump)
-7. Committed ITD-021 v1/v2/v3 together with iteration narrative in commit body (`e5289f2`)
-8. Added `idt-blog-itds` server to `~/.claude/launch.json` (python http.server on port 8090) for preview verification
-9. Opened every version in preview and verified via screenshots + preview_eval state probes
+1. **Lever is the canonical interaction pattern.** One canvas, one pivoting arc lever, continuous log-fps mapping [60, 20000] with eight preset ticks. Established in ITD-020; carried to ITD-021 prototypes and back-propagated to ITD-011 (fps cap bump).
+2. **Preset labels are shared across lever-based ITDs.** `phone camera / action cam / broadcast / industrial / science lab / ballistics / impact research / the ceiling`.
+3. **20,000 fps is the hard cap.** Do not exceed.
+4. **ITD-020 and ITD-021 teach different lessons with the same lever.** ITD-020: slow-motion = capture/playback ratio. The rejected ITD-021 prototypes tried "temporal measurement ruler"; the owner's rebaseline direction is "how crash tests are actually measured" over a 50 ms event.
+5. **Remote provisioned public.** Pages on free tier requires public. Consistent with `overcrank`, `splat-desktop`, `idt-content-plan` which are also public for sharing intent. Global rule prefers private; override here was explicit for URL-sharing.
+6. **Root URL strategy:** thin meta-refresh `index.html` points to the current gallery version. Bump the href each time a new `index_vN.html` becomes live. Preserves versioning discipline without forcing viewers to know the version number.
 
 ## Next Actions
 
-1. **Live-review ITD-021 v3.** Pull the lever across the range. Confirm peak excursion renders visibly around the 0.72 mark of each loop, that airbag covers head at peak, that stutter cadence feels instructive at 60 fps without reading as broken.
-2. **Activate `index_v13.html`** if ITD-021 passes review. v13 adds the ITD-021 card to the Generic grid right after ITD-020, bumps hero count 16 → 17 and Generic count 10 → 11. Featured hero stays on ITD-020. **Caveat:** v13 is based on the parallel-session `index_v12.html` so it inherits the link to `itd-008-bit-depth_v4.html` which is still untracked. Fresh clones would 404 on that card until the parallel work is committed.
-3. **Commit parallel-session ITD-008/gallery work.** `itd-008-bit-depth_v3/v4.html` and `index_v11/v12.html` are untracked. Separate commit, not this session's scope.
-4. **Configure `cia-mac` GitHub remote + Pages.** Still blocked. Nothing shareable by URL yet.
-5. **Housekeeping:** `SDI_HighSpeed_Cameras_Preview.pdf`, `SESSION_STATE_v4.md.bak`, `console-workflow_v1.html` are stale untracked files from prior sessions. Probably archive candidates.
+1. **ITD-021 direction.** Owner-owned. v1 is being iterated with the new framing. Claude should stay out unless asked.
+2. **Batch ITD v3→v5+ redesign for remaining files** (ITD-002/003/006/007/009/013 still at v4). The new bar is v5/v6 with scene-aware rendering, gradient+glow, unified light direction. Tracks with existing Notion task "Batch ITD v3 redesign (14 remaining files)" but scope has moved to "v5+".
+3. **Custom domain on Pages** (optional). Currently `cia-mac.github.io/idt-blog-itds`. If ciamac.com/blog-itds or similar is desired, add a CNAME file and configure DNS.
+4. **IDT-specific bucket is still dormant** per Luiz locked read. Six IDT-specific ITDs sit at v4/v5; not safe to share externally; not urgent.
 
 ## Blockers
 
-- ~~No git remote~~ **Remote + Pages provisioned 2026-04-20.** `origin` = https://github.com/cia-mac/idt-blog-itds (public). Pages live at https://cia-mac.github.io/idt-blog-itds/. Root serves `index.html` which meta-refreshes to `index_v12.html` (the live gallery); bump that href when the gallery version advances. Repo is public to enable Pages on the free tier; switch to private only if a Pro/Team plan is active.
-- **IDT work on ice** per Luiz locked read (2026-04-14). `idt-specific/` bucket dormant. `generic/` is safe to keep developing.
+- **IDT work on ice** per Luiz locked read (2026-04-14). `idt-specific/` bucket is dormant. `generic/` is portfolio-safe under ciamac.com.
 
 ## Fragile Areas
 
-### Shared with ITD-020
+### Lever-pattern ITDs (ITD-020, ITD-021 prototypes)
 
-- Preset active-state tolerance (ratio 0.97-1.03), analytic particle landing, bullet motion-blur clipping, scene-end fade coupling. See SESSION_STATE_v5 for detail.
+- Preset active-state tolerance ratio 0.97-1.03.
+- Log-scale fps mapping assumes FPS_MIN=60, FPS_MAX=20000 constants. Do not change these without updating TICK_FPS and subtitle copy.
+- Lever hit area = entire lever canvas (click anywhere maps to angle). Preserve if refactoring.
 
-### ITD-021 specific
+### ITD-020 specific
 
-- **Sampling quantization epsilon.** `Math.floor(trueT * N + 1e-6)` deliberately avoids a boundary bug when `trueT === i/N` exactly. Do not remove the epsilon.
-- **Shutter flash resets.** `lastSampledIdx` is reset to -1 both on lever change (`setFps`) and on loop restart (`animateScene` pause-gap exit). Any new trigger condition needs both resets to stay consistent.
-- **Head rest Y = 176** is tuned to sit below the roof polygon top edge at y=148. If the car roof repositions, re-verify the head doesn't clip.
-- **Airbag growth direction** assumes WHEEL_CX=235, WHEEL_CY=258, and inflates toward (cx + r·0.75, cy − r·0.55). Moving the wheel without rechecking this will push the airbag into the wrong scene element.
-- **Playback duration is constant 3.2 s** in ITD-021 (vs fps-scaled in ITD-020). The two ITDs use the same lever for different mental models. Do not unify the playback math.
-- **Timeline dot density:** at N > 400 the tick alpha drops to 0.22 and lineWidth to 0.5 so the bar reads as a progress fill rather than individual ticks. Below that threshold ticks are discrete. The threshold is visual not semantic; tune if it doesn't feel right.
+- Analytic particle landing depends on `vy² + 2·GRAVITY·dy ≥ 0`. Falls back to 99 sentinel if negative.
+- Bullet motion-blur streak at low fps extends beyond SCN_W before clip.
+- Scene-end fade applied in two places (drawParticles + drawImpactFlash/drawBullet). New scene elements need the same fade.
+
+### ITD-021 prototypes (v2/v3)
+
+- Sampling quantization epsilon `+1e-6` in `floor(trueT * N + 1e-6)` avoids boundary bug. Don't remove.
+- `lastSampledIdx` reset to -1 on lever change AND loop restart. Both resets must stay.
+- Head rest Y = 176 is tuned to sit below roof polygon top (148).
+- Airbag growth direction assumes WHEEL_CX=235, WHEEL_CY=258.
+
+### Gallery / deployment
+
+- `index.html` meta-refresh hardcodes the current gallery version. Bump the href when promoting a new `index_vN.html`.
+- Pages rebuilds automatically on push to `main`. Usually green within 30-60 seconds.
+- Repo is public; do not commit secrets.
 
 ## Context for Next Session
 
-- **ITD-020 v8 is the canonical slow-motion demo.** ITD-021 v3 is the temporal-resolution companion. Two ITDs, one lever grammar, two lessons.
-- **Head is muted gray in ITD-021 by design.** Gold is reserved for the measurement overlay (trajectory + sample dots + reconstructed line + timeline + shutter flash). Do not recolor the head gold.
-- **Preset labels are verbatim shared** across ITD-020 and ITD-021: `phone camera / action cam / broadcast / industrial / science lab / ballistics / impact research / the ceiling`. Keep this across any new ITD in the series.
-- **20,000 fps is still the cap.** Do not exceed.
-- **120 ms is the canonical crash physical duration.** 5 ms for slow-mo. Subject determines duration; duration determines N at each fps.
-- **Gallery is currently at `index_v12.html`** (parallel-session output). Not yet committed. If you start a new session, check whether the parallel work has been consolidated before writing `index_v13.html`.
+- **URL lives at** https://cia-mac.github.io/idt-blog-itds/. Gallery is v17. Ten generic diagrams visible. Six IDT-specific diagrams still on ice.
+- **Lever template is established.** Copy ITD-020 v8 as the starting point for any new lever-based ITD.
+- **Preset labels, 20k cap, log-fps mapping are invariants.** Do not change.
+- **Gold is for measurement/emphasis, not the subject.** Heads, dummies, subjects render in muted tones. Gold carries the accent.
+- **Version discipline is enforced.** Every file bumps version suffix. Previous versions stay in place. Deletions go to `archive/`.
